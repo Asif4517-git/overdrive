@@ -1,0 +1,178 @@
+================================================================================
+NEON RUSH — DEVELOPMENT PLAN
+A complete plan for building, extending and reusing the game
+================================================================================
+
+Project : NEON RUSH — browser-based 3D arcade racing game
+Creator : Asif (https://asif4517-git.github.io/ / @asif_xrk)
+Platform: Any modern desktop or mobile browser (WebGL2)
+Hosting : Static single-page site — GitHub Pages compatible
+Build   : React + TypeScript + Vite + Three.js + Web Audio API
+
+
+--------------------------------------------------------------------------------
+1. PRODUCT GOALS
+--------------------------------------------------------------------------------
+1.1 Deliver a complete, replayable arcade racer that loads in the browser with
+    no install, no account and no backend.
+1.2 Make driving feel physical: momentum, grip, sliding, weight and speed.
+1.3 Present a premium neon-night visual identity and a clean racing interface.
+1.4 Run smoothly on ordinary laptops at high quality and on phones at low.
+1.5 Be easy to extend with new cars, circuits and game modes.
+1.6 Be deployable to GitHub Pages with one git push.
+
+
+--------------------------------------------------------------------------------
+2. TECHNICAL ARCHITECTURE
+--------------------------------------------------------------------------------
+2.1 Layers
+
+  UI LAYER (React)
+    - Screen state machine (menu, garage, circuits, settings, about,
+      how-to, race, results)
+    - HUD, pause menu, results
+    - Persistent settings and profile (localStorage)
+    - Never contains physics logic
+
+  GAME ENGINE (TypeScript class RaceGame)
+    - Scene, renderer, camera
+    - Fixed-step simulation loop
+    - Player physics, AI, collisions, lap/checkpoint logic
+    - Particle systems, post-processing
+    - Publishes HUD snapshots to React about 20 times per second
+    - Owns and disposes all GPU resources
+
+  CONTENT MODULES
+    - track.ts        spline circuits, road meshes, barriers, gates
+    - environment.ts  city, sky, lights, signage, ambient motion
+    - carModel.ts     procedural car bodies, wheels, lights, nitro FX
+    - data.ts         car and circuit definitions (pure data)
+    - audio.ts        synthesized engine, effects and music
+    - particles.ts    GPU particle pools
+    - textures.ts     canvas-generated textures
+
+  Foundation
+    - everything is data-driven where possible (cars, tracks, palette)
+    - typed interfaces in types.ts
+    - no external 3D or audio asset downloads
+
+
+2.2 Runtime data flow (one frame)
+
+  requestAnimationFrame
+      -> clock delta (capped)
+      -> accumulator loop at fixed 1/60 s
+           -> controls input
+           -> player physics
+           -> AI update
+           -> collisions (walls and cars)
+           -> lap, checkpoint and timing logic
+           -> camera update
+           -> particles
+           -> particles / audio update
+           -> HUD snapshot (throttled)
+      -> render scene (composer: bloom + tone mapping)
+      -> next frame
+
+  React is never in the physics loop. It only renders HUD state supplied by
+  the engine, so UI work cannot change handling or timing.
+
+2.3 Screen and audio lifecycle
+
+  Menu -> Race:
+    - create RaceGame in a mounted container
+    - initialise AudioContext after the user gesture
+    - start engine and race music
+  Race -> Result:
+    - engine freezes the player and reports the classification
+    - results screen reads the final race result
+  Race -> Menu:
+    - dispose the engine: stop RAF, remove listeners, dispose geometries,
+      materials, renderer, composer and particles
+    - audio continues in menu mode
+
+
+--------------------------------------------------------------------------------
+3. DELIVERY PHASES (AS BUILT)
+--------------------------------------------------------------------------------
+Phase 1  Foundation ........ project scaffold, build, styling system, screens
+Phase 2  Driving slice ..... one car, one track, camera, controls, engine loop
+Phase 3  Race systems ...... laps, sectors, positions, AI, results, audio
+Phase 4  World ............ three circuits, city, skyline, lighting, detail
+Phase 5  Cars ............. modelling, wheels, lights, nitro, garage art
+Phase 6  Interface ........ menu, garage, circuits, settings, about, HUD
+Phase 7  Polish ........... bloom, particles, particles, responsive, touch
+Phase 8  QA and release ... browser tests, bug fixes, deployment workflow
+
+
+--------------------------------------------------------------------------------
+4. ACCESSIBILITY AND USABILITY CHECKLIST
+--------------------------------------------------------------------------------
+[ ] Text remains readable at 125% and 150% browser zoom.
+[ ] All pages scroll; no content is clipped at 768 px height.
+[ ] Header, content and footer share one alignment grid.
+[ ] Portrait and landscape both usable.
+[ ] Keyboard-only navigation works on every screen.
+[ ] Touch controls reachable with thumbs and do not cover the road.
+[ ] Reduced-motion users do not get essential info from animation alone.
+[ ] Colour is not the only signal for position, sector or warning states.
+[ ] Audio is muted by default until the user interacts.
+[ ] Loading state is visible and honest.
+
+
+--------------------------------------------------------------------------------
+5. QUALITY GATES
+--------------------------------------------------------------------------------
+Gate A — Start a race, drive cleanly, pause, restart, finish, see results.
+Gate B — 60 fps target on a normal desktop; stable 30+ on phone/low profile.
+Gate C — No console errors on any screen.
+Gate D — Every button performs a real action.
+Gate E — Persisted settings and records survive reload.
+Gate F — Production build works from a GitHub Pages subpath.
+Gate G — Mobile layout has no horizontal overflow or hidden controls.
+Gate H — Every player-facing feature is documented honestly.
+
+
+--------------------------------------------------------------------------------
+6. KNOWN LIMITATIONS OF THE CURRENT BUILD
+--------------------------------------------------------------------------------
+- AI opponents only; no online multiplayer.
+- No licensed real cars, tracks or sound recordings.
+- Arcade collision response, not full rigid-body damage.
+- Environment reflections from procedural cube map, not screen space.
+- Records stored in one browser only.
+- Physical console/controller mapping is basic.
+- No replay editor or ghost racing yet.
+
+
+--------------------------------------------------------------------------------
+7. BACKLOG — RECOMMENDED NEXT RELEASES
+--------------------------------------------------------------------------------
+Release 1.1  Time trial, ghost replay, local leaderboards, remappable controls
+Release 1.2  Full gamepad and controller support, assists menu, camera tuning
+Release 1.3  Garage 3D turntable, livery editor, more cars, more circuits
+Release 1.4  Rain and wet-grip weather system, night/day toggle, photo mode
+Release 1.5  Career and championships, achievements, unlock economy
+Release 2.0  Optional online leaderboards and shared ghost challenges
+             (backend kept fully separate from offline play)
+
+
+--------------------------------------------------------------------------------
+8. SCALING RULES FOR A LARGER SEQUEL
+--------------------------------------------------------------------------------
+- Keep simulation and rendering separate. Port the simulation unchanged.
+- Move car/track definitions into JSON so new content needs no code changes.
+- Generate road and scenery meshes in chunks so larger maps stream.
+- Keep one authoritative physics timestep regardless of frame rate.
+- Budget: 1 draw-call-heavy system at a time; instance repeating props.
+- Test every new mode against Gates A-H before showing it in the menu.
+
+
+--------------------------------------------------------------------------------
+9. SUMMARY
+--------------------------------------------------------------------------------
+NEON RUSH is a complete static web game: React interface, a modular Three.js
+engine, procedural content and synthetic audio. The architecture is deliberately
+small and legible so the same platform, physics and UI system can be reused to
+build different driving games with new worlds, cars and modes.
+================================================================================

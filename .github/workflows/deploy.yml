@@ -1,0 +1,78 @@
+name: Deploy OVERDRIVE to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Permissions required by the official GitHub Pages deployment actions.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deployment at a time. Queued runs wait; in-progress runs
+# are not cancelled so a live deployment is never left half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build game
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          # Puppeteer is only used by the local QA harnesses in scripts/.
+          # Skip its Chromium download so Pages builds stay fast.
+          PUPPETEER_SKIP_DOWNLOAD: "true"
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Build production game
+        run: npm run build
+
+      - name: Verify and prepare Pages artifact
+        run: |
+          test -f dist/index.html || { echo "dist/index.html is missing"; exit 1; }
+          touch dist/.nojekyll
+          SIZE=$(du -h dist/index.html | cut -f1)
+          echo "Built dist/index.html ($SIZE)"
+          ls -lh dist
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: Publish to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

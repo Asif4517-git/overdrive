@@ -1,0 +1,1475 @@
+================================================================================
+OVERDRIVE — WORKING FILE / COMPLETE HANDOVER
+For the next developer or AI agent continuing this project
+================================================================================
+
+Last updated   : current working session
+Project        : OVERDRIVE — Real roads. Real machines. Pure driving.
+Type           : Browser-based 3D driving game (static frontend, no backend)
+Repository     : https://github.com/asif4517-git/overdrive
+Live URL       : https://asif4517-git.github.io/overdrive/
+Local folder   : project root (this repository)
+Production     : dist/index.html — one self-contained file (~2.74 MB, ~1.53 MB gzip)
+Status         : Playable; production build passing; browser-tested.
+
+This document is deliberately detailed. Read it fully before changing code. It
+records what exists, how it works, what was tested, what is not finished, and the
+rules that must not be broken. If you only read one section, read:
+  - Section 4  Repository and hosting
+  - Section 10 Physics (exact formulas)
+  - Section 11 Wheel system invariants
+  - Section 18 Testing and known issues
+  - Section 23 Hand-off rules
+
+
+================================================================================
+1. OWNER / CREATOR ATTRIBUTION (EXACT — DO NOT INVENT DETAILS)
+================================================================================
+
+Creator / Developer : Asif
+Portfolio           : https://asif4517-git.github.io/
+Instagram           : @asif_xrk
+Instagram URL       : https://instagram.com/asif_xrk
+Email               : asifsrk4517@gmail.com
+GitHub username     : asif4517-git
+
+Rules:
+- These are the only personal details that may be represented.
+- Do not invent achievements, credentials, employers, locations, phone numbers,
+  roles or social accounts.
+- Attribution appears in:
+    src/game/credits.ts                       (single source of truth)
+    src/overdrive/site.ts                     (site/repo/live config)
+    src/overdrive/ui/common.tsx               (header/footer)
+    src/overdrive/ui/About.tsx                (full credits page)
+    src/overdrive/ui/SettingsPage.tsx         (Data tab)
+    index.html                                (meta tags + JSON-LD)
+    README.md
+    REPO_DESCRIPTION.txt
+    GITHUB_PAGES.md
+    working.txt (this file)
+- Do not change the game into a commercial product claiming official affiliation
+  with any car manufacturer or motorsport venue.
+
+
+================================================================================
+2. WHAT THIS GAME IS
+================================================================================
+
+OVERDRIVE is a realistic-leaning 3D driving game that runs entirely in the
+browser. It is built on the same codebase that previously contained the neon
+arcade game NEON RUSH. The OVERDRIVE UI is the active application. The older
+NEON RUSH modules still exist in src/game/ and are used by OVERDRIVE for:
+  - src/game/particles.ts     — pooled GPU particle systems
+  - src/game/credits.ts       — developer attribution
+  - src/components/Icons.tsx  — shared SVG icon set
+
+Do not confuse the two:
+  - ACTIVE GAME:  src/overdrive/ + src/App.tsx + src/index.css
+  - LEGACY CODE:  src/game/GameEngine.ts, track.ts, environment.ts, carModel.ts,
+                  audio.ts, data.ts etc. (not referenced by the active app except
+                  particles.ts and credits.ts). They can be removed later, but
+                  verify imports first.
+
+Core experience:
+  - 11 real production cars with individual physics data.
+  - 6 circuits / environments in India and international-inspired settings.
+  - 4 modes: Circuit Race, Time Trial, Sprint, Drift Attack.
+  - Automatic and manual gearboxes.
+  - Dynamic weather and time of day.
+  - Chase, wide chase, hood and right-hand-drive cockpit cameras.
+  - 3D garage viewer and internal model studio.
+  - Fully rebindable keyboard controls, touch controls, local saves.
+  - No backend, login, online multiplayer, analytics or cloud storage.
+
+
+================================================================================
+3. REPOSITORY FILES AND URLs
+================================================================================
+
+Recommended repository name : overdrive
+Owner                       : asif4517-git
+Repository                  : https://github.com/asif4517-git/overdrive
+Live site                   : https://asif4517-git.github.io/overdrive/
+Actions                     : https://github.com/asif4517-git/overdrive/actions
+Issues                      : https://github.com/asif4517-git/overdrive/issues
+
+Repository description (paste into GitHub About → Description, 258 chars):
+  Realistic browser driving game by Asif. 11 cars, manual gearbox, weather, 6
+  circuits and a 3D garage. React + Three.js. Live:
+  https://asif4517-git.github.io/overdrive/ · Portfolio:
+  https://asif4517-git.github.io/ · Instagram @asif_xrk ·
+  asifsrk4517@gmail.com
+
+Website field:
+  https://asif4517-git.github.io/overdrive/
+
+Topics:
+  driving-game, racing-game, car-simulator, threejs, react, typescript, vite,
+  webgl, github-pages, browser-game, procedural-generation, game-development,
+  asif4517-git
+
+The Play Live button is the first badge at the top of README.md. The game also
+shows Play Live and Source links in the About page, the site footer and a GitHub
+icon in the site header. All are generated from src/overdrive/site.ts except the
+README badges.
+
+If the repository is renamed, update these places:
+  1. src/overdrive/site.ts                    -> REPO_NAME
+  2. README.md                                -> Play Live / Source badge links
+  3. index.html                               -> og:url, canonical, JSON-LD url/sameAs
+  4. GITHUB_PAGES.md
+  5. REPO_DESCRIPTION.txt
+  6. working.txt (this file)
+
+The build is a single inlined HTML file, so no Vite `base` change is required for
+a project subpath. Do not add absolute `/assets/...` paths to new code.
+
+Files added specifically for GitHub hosting:
+  .github/workflows/deploy.yml     build + type-check + deploy to Pages
+  public/.nojekyll                 prevents Jekyll processing (copied to dist)
+  GITHUB_PAGES.md                  step-by-step deployment and troubleshooting
+  REPO_DESCRIPTION.txt             repository description, website, topics, gh cmds
+  scripts/set-repo-metadata.sh     one-command `gh` metadata setup
+  working.txt                      this handover
+
+
+================================================================================
+4. DEPLOYMENT — HOW IT WORKS
+================================================================================
+
+Workflow: .github/workflows/deploy.yml
+Trigger : push to `main`, or manual `workflow_dispatch`
+Runs on : ubuntu-latest, Node 22
+
+Steps:
+  1. checkout
+  2. setup-node with npm cache
+  3. npm ci (PUPPETEER_SKIP_DOWNLOAD=true, PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true)
+  4. npx tsc --noEmit
+  5. npm run build             -> dist/index.html
+  6. verify dist/index.html exists; touch dist/.nojekyll; list output
+  7. actions/configure-pages@v5 (enablement: true)
+  8. actions/upload-pages-artifact@v3 (path: dist)
+  9. actions/deploy-pages@v4 in the `github-pages` environment
+
+Permissions: contents: read, pages: write, id-token: write.
+Concurrency: group "pages", cancel-in-progress false.
+
+One-time GitHub setup:
+  1. Create a PUBLIC repository named `overdrive` under asif4517-git.
+  2. Push the project to `main`.
+  3. Settings → Pages → Source → GitHub Actions.
+  4. Actions → Deploy OVERDRIVE to GitHub Pages → Run workflow (if needed).
+  5. Open https://asif4517-git.github.io/overdrive/
+
+Full instructions and troubleshooting: GITHUB_PAGES.md.
+Manual fallback (gh-pages branch) is documented there too.
+
+VERIFIED LOCALLY:
+  - `npm ci` with Puppeteer download skipped succeeds.
+  - `npx tsc --noEmit` passes.
+  - `npm run build` succeeds.
+  - The build was served from a simulated repository subpath and the game
+    loaded, drove and finished an event without console errors.
+  - Workflow YAML parsed successfully: name "Deploy OVERDRIVE to GitHub Pages",
+    triggers push/main + workflow_dispatch, jobs build and deploy, 8 build steps,
+    permissions contents:read / pages:write / id-token:write.
+  - index.html metadata verified in the browser: author, canonical, og:url,
+    JSON-LD VideoGame author Asif with portfolio + email + Instagram and the
+    live URL.
+  - Header GitHub link, footer Play Live + Source links, About page Play Live,
+    Source, portfolio, Instagram and email all exist with the exact URLs and
+    safe rel="noopener noreferrer" (mailto excepted).
+  - Settings -> Data & about shows the attribution and contact links.
+  - Mobile 390x844: no horizontal overflow, GitHub header link present, footer
+    links present, page scrolls.
+  - Deployed the build under /overdrive/ on a local HTTP server: the game
+    booted, created the canvas and HUD and ran with zero page errors.
+  - Actual GitHub upload was NOT performed from this environment (no account
+    access), so the workflow has not run on GitHub in this session.
+
+
+================================================================================
+5. LOCAL DEVELOPMENT
+================================================================================
+
+Prerequisites: Node.js 20+ (Node 22 used in CI), npm, a WebGL2-capable browser.
+
+Commands:
+  npm install                 install dependencies
+  npm run dev                 Vite development server (default :5173)
+  npm run build               production build -> dist/index.html
+  npm run preview             serve the production build (default :4173)
+  npx tsc --noEmit            strict type-check
+
+Open dist/index.html directly if desired. External Google Fonts require network;
+fallback fonts are declared, so the game still runs offline.
+
+Do NOT edit package.json or vite.config.ts manually in this managed environment
+unless the task truly requires it. Prefer `npm install <package>`.
+
+Stack versions (as installed):
+  react 19.2.6
+  react-dom 19.2.6
+  three 0.187.x
+  vite 7.3.2
+  typescript 5.9.3
+  tailwindcss 4.1.17
+  vite-plugin-singlefile 2.3.0
+  puppeteer 24.x (dev, only for QA scripts)
+
+State is global React state in src/App.tsx. There is no Redux/Zustand.
+The 3D game is a single imperative class: src/overdrive/engine.ts (OverdriveGame).
+
+
+================================================================================
+6. FILE MAP — ACTIVE APPLICATION
+================================================================================
+
+index.html
+  Document shell, Google Fonts, metadata, author/creator/developer tags,
+  canonical, og:url, keywords, JSON-LD VideoGame with author details.
+  Title: "OVERDRIVE — Realistic Driving Game"
+
+src/main.tsx
+  React root.
+
+src/App.tsx
+  Application state machine and persistence.
+  - screens: home | garage | tracks | settings | about | race | results
+  - defaults: carId "m3", trackId "ng-speedway", mode "race"
+  - localStorage keys: overdrive-settings-v1, overdrive-profile-v1
+  - resolves weather/time-of-day per selected track (resolveConditions)
+  - starts races by building RaceConfig and mounting RaceScreen
+  - saves results: best lap per track, drift best per track, wins, races
+  - #models hash renders ModelStudio instead of the game screens
+
+src/index.css
+  The whole visual system: automotive palette, typography, layout grid,
+  buttons, chips, panels, garage cards, settings rows, HUD, overlays,
+  race shell, touch controls, responsive breakpoints, animations,
+  reduced-motion support.
+
+src/overdrive/types.ts
+  All shared types and defaults:
+  ScreenName, Quality, Weather, TimeOfDay, RaceMode, Transmission, CameraMode,
+  BodyStyle, CarId, TrackId, CarSpec, TrackDef, KeyBindings, Settings,
+  RaceConfig, RacerSnapshot, HudState, Standing, RaceResult,
+  DEFAULT_KEYS, DEFAULT_SETTINGS, KEY_ACTIONS, formatKey, formatTime, ordinal.
+
+src/overdrive/data.ts
+  CARS (11), TRACKS (6), MODES (4), BODY_IMAGES, AI_NAMES, AI_COLORS,
+  WEATHER_LABEL, getCar, getTrack, getMode.
+  Approximate published specifications. Reference mapping:
+    swift   <- reference 1 (red hatchback)
+    city    <- reference 2 (silver sedan)
+    fortuner<- reference 3 (white SUV)
+    m3      <- reference 4 (green performance sedan)
+    f296    <- reference 5 (red mid-engine supercar)
+
+src/overdrive/carDesigns.ts
+  Per-vehicle geometry specification (the most important car file).
+  Fields:
+    length, width, height, wheelbase, wheelRadius, wheelWidth, track,
+    lowerY (sill height), beltY (window base), rearWheelZ, frontWheelZ,
+    archRadius, top (silhouette [z,y] points), cabin {frontZ, rearZ,
+    roofFrontZ, roofRearZ, roofY, width, roofTaper}, glassFront/glassRear
+    polygons, grille ("hex" | "chromeBar" | "slats" | "kidney" | "mesh" |
+    "round"), headlights, taillights, wheelStyle, wheelColor, caliperColor,
+    darkCladding, features {...}, cockpit {x,y,z}, shadowLength.
+  To add or restyle a car, this file is the primary work surface.
+
+src/overdrive/carModel.ts
+  Procedural 3D vehicle builder. See Sections 11 and 12.
+  Exports createVehicleVisual(car, {quality, isPlayer}) -> VehicleVisual.
+  Builds:
+    - extruded bevelled body from the silhouette with real wheel-arch cut-outs
+    - separate cabin shell, side/front/rear glazing, roof, pillars
+    - mirrors, handles, door shut lines, arch flares, sills
+    - model-specific grille, headlights, DRLs, taillights, brake/reverse lamps,
+      indicators, exhausts, diffuser, wing/splitter, roof rails, side steps,
+      spare wheel, hood vents/scoop, side intakes, antenna
+    - four wheel assemblies (Section 11)
+    - right-hand-drive interior (dashboard, cluster, wheel, seats, console,
+      shifter, mirror, pillars)
+    - contact shadow, player headlight spotlight
+  The visual is attached to a root group positioned by the engine each frame.
+
+src/overdrive/track.ts
+  createRoadTrack(def) -> RoadTrack.
+  Closed Catmull-Rom spline from 48 control points; arc-length sampled
+  (~length/2.4, clamped 380..1400 samples).
+  Generates road ribbon with asphalt texture and markings, shoulders, kerbs,
+  guardrails and posts, reflectors, start line and grid marks, timing gantry,
+  two checkpoint arches, grandstands/pit wall for circuits, braking boards,
+  puddles, minimap points, wet-state material switching.
+  API: samples, length, width, halfWidth, minimap, startPos, startHeading,
+       nearestIndex(pos, hint), sampleAt(progress), setWet(bool), dispose().
+
+src/overdrive/environment.ts
+  createWorld(track, def, scene, quality, weather, timeOfDay) -> WorldRig.
+  Sky shader, sun, hemisphere/ambient, procedural terrain, mountains, clouds,
+  vegetation (instanced trunks/crowns), rocks, palms for coast, sea and beach,
+  city blocks with window textures, streetlights, tyre stacks, Indian and
+  international road signs, rain particle system, fog.
+  Quality affects vegetation count, shadow map size and city density.
+
+src/overdrive/engine.ts
+  OverdriveGame — the driving simulation. See Sections 9, 10, 11, 17.
+  Owns renderer, scene, camera, post-processing, player physics, AI, laps,
+  collisions, race state, HUD snapshots, audio session and debug hooks.
+
+src/overdrive/audio.ts
+  DriveAudio + getDriveAudio() singleton.
+  Synthesised engine (3 oscillators + sub), wind, rain, tyre squeal, road
+  noise; effects: countdown, UI, checkpoint, lap, shift indicator, crash,
+  finish; original generative music loop.
+  Buses: master, music, sfx, engine.
+  API: init, setSettings, startEngine, updateEngine(params), shiftIndicator,
+       crash, countdown, uiClick/uiConfirm/uiBack, checkpoint, lap, finish,
+       startMusic, stopMusic, setEngineMuted, dispose.
+
+src/overdrive/site.ts
+  REPO_OWNER, REPO_NAME, REPO_URL, LIVE_URL, PAGES_URL, ISSUES_URL, SITE,
+  isDeployed. Single source of truth for GitHub/live links.
+
+src/overdrive/ui/common.tsx
+  Logo, Header (all pages, sticky), Footer (attribution + Play live + Source +
+  portfolio/Instagram/email), SectionTitle, carImage, StatBar, useTrackPath,
+  TrackMap, KeyValue.
+
+src/overdrive/ui/Home.tsx
+  Hero with generated artwork, title, description, mode selector, current car,
+  track map, weather/time selectors, gearbox toggle, Ignition button.
+
+src/overdrive/ui/Garage.tsx
+  Filterable list of 11 cars, live VehicleViewer with four angle presets,
+  specifications, performance bars, driving character, drive/circuits buttons,
+  legal notice.
+
+src/overdrive/ui/VehicleViewer.tsx
+  Standalone Three.js studio: PMREM environment, studio floor, turntable ring,
+  key/fill/rim lights, shadows, drag orbit, wheel zoom, angle presets,
+  graceful WebGL failure message. Used by Garage and ModelStudio.
+
+src/overdrive/ui/ModelStudio.tsx
+  Internal QA page at #models. Lists all 11 cars, angle buttons, quality
+  buttons, model dimensions, description of the geometry/wheel system.
+
+src/overdrive/ui/Tracks.tsx
+  Six track cards with maps, difficulty, grip, weather/time, length, best lap,
+  filters by theme, selection and start.
+
+src/overdrive/ui/SettingsPage.tsx
+  Five tabs: Driving, Controls, Audio, Graphics, Data & about.
+  Driving: transmission, default camera, assists, damage, racing-line toggle
+  (UI only — not yet applied in physics, see Known issues), steering
+  sensitivity, default weather/time, units, HUD minimap/standings.
+  Controls: every keybind with click-then-press rebinding, conflict warnings,
+  reset keys.
+  Audio: master/music/SFX sliders, test sound, presets.
+  Graphics: quality presets, HUD toggles, fullscreen.
+  Data & about: event/wins/car/circuit counts, best laps, attribution, reset
+  progress with confirmation, local-data warning.
+
+src/overdrive/ui/About.tsx
+  Creator profile, contact links, legal/unofficial notice, game overview,
+  controls, technology/privacy, open-source & hosting panel with Play Live,
+  source link and repo/live URLs.
+
+src/overdrive/ui/RaceScreen.tsx
+  Mounts OverdriveGame, HUD, start lights, touch controls, pause overlay with
+  Resuming/Restart/Options/Leave, in-race audio sliders and quality switching.
+  Remount key includes track, car, mode, weather, transmission, damage, assists.
+
+src/overdrive/ui/Results.tsx
+  Race classification (or time-trial/drift summary), best lap, top speed,
+  records, circuit map, restart/change car/change circuit/home, setup link.
+
+src/game/particles.ts
+  ParticlePool used by the engine for tyre smoke, spray and sparks.
+  Fixed-size buffers, custom shader, no per-frame allocation.
+
+src/game/credits.ts
+  DEVELOPER object: name, portfolio, instagram, email, role, project.
+  Keep values exact.
+
+src/components/Icons.tsx
+  Shared SVG icons including GitHubIcon, PlayCircleIcon, ExternalLinkIcon,
+  CarIcon, FlagIcon, GaugeIcon, GearIcon, FuelIcon, WrenchIcon, WeatherIcon,
+  KeyIcon, SettingsIcon, VolumeIcon, MuteIcon, PauseIcon, RestartIcon,
+  HomeIcon, CloseIcon, etc.
+
+Assets:
+  src/assets/od-hero.jpg       realistic Kerala highway hero art
+  src/assets/od-hatch.jpg      red hatchback reference/garge art
+  src/assets/od-sedan.jpg      silver sedan reference/garage art
+  src/assets/od-suv.jpg        white SUV reference/garage art
+  src/assets/od-sports.jpg     green performance sedan reference/garage art
+  src/assets/od-super.jpg      red mid-engine supercar reference/garage art
+  These are AI-generated reference/atmosphere images, not licensed photography.
+  In the game, the garage uses live 3D models; the images are used for cards,
+  hero and results backdrops.
+
+Legacy NEON RUSH files remain in src/game/ but are not used by OVERDRIVE UI
+except particles.ts and credits.ts. Do not delete without checking imports.
+
+
+================================================================================
+7. APP FLOW / SCREEN STATE MACHINE
+================================================================================
+
+App state
+  screen       : "home" | "garage" | "tracks" | "settings" | "about" | "race" | "results"
+  carId        : default "m3"
+  trackId      : default "ng-speedway"
+  mode         : default "race"
+  settings     : persisted
+  profile      : persisted (bestLaps, driftBest, wins, races)
+  raceConfig   : built at race start
+  result       : last RaceResult
+
+Navigation
+  Header links -> home/garage/tracks/settings/about.
+  Home Ignition / Drive buttons -> startRace().
+  Garage Drive -> startRace() (uses current track + mode).
+  Tracks Select -> updates track; Drive/start -> startRace().
+  Results Replay -> startRace(result.mode, result.trackId, result.carId).
+  Hash #models -> ModelStudio (bypasses the game screens).
+  Every non-race screen scrolls to top on navigation.
+
+Race config built by startRace():
+  trackId, carId, mode,
+  weather = settings.weather === "track" ? track.weather : settings.weather,
+  timeOfDay = settings.timeOfDay === "track" ? track.timeOfDay : settings.timeOfDay,
+    (forced "night" for night weather and "sunset" for sunset weather),
+  quality, transmission, camera, damage, assists,
+  sensitivity = settings.steeringSensitivity,
+  keys = deep copy of settings.keys.
+
+Result handling:
+  best lap saved if lap mode and bestLap is a new record;
+  drift score saved if higher than previous drift best;
+  wins +1 only for lap modes when position === 1;
+  races +1 every completed event;
+  newRecord flag shown on results.
+
+Local save keys
+  overdrive-settings-v1:
+    { quality, master, music, sfx, transmission, camera, weather, timeOfDay,
+      damage, assists, hudMinimap, hudStandings, steeringSensitivity, units,
+      showRacingLine, keys }
+  overdrive-profile-v1:
+    { bestLaps: { [trackId]: seconds }, driftBest: { [trackId]: score },
+      wins: number, races: number }
+  Loaders merge with DEFAULT_SETTINGS / empty profile, validate quality,
+  transmission, camera keys and clamp steering sensitivity 0.5..1.6.
+  Reset data removes profile only; settings remain.
+
+
+================================================================================
+8. DEFAULT SETTINGS AND CONTROL BINDINGS
+================================================================================
+
+DEFAULT_SETTINGS (src/overdrive/types.ts):
+  quality               "high"
+  master                0.85
+  music                 0.30
+  sfx                   0.85
+  transmission          "auto"
+  camera                "chase"
+  weather               "track"
+  timeOfDay             "track"
+  damage                true
+  assists               true
+  hudMinimap            true
+  hudStandings          true
+  steeringSensitivity   1
+  units                 "kmh"
+  showRacingLine        false
+  keys                  DEFAULT_KEYS
+
+Default keys:
+  accelerate   KeyW
+  brake        KeyS
+  left         KeyA
+  right        KeyD
+  handbrake    Space
+  shiftUp      KeyE
+  shiftDown    KeyQ
+  camera       KeyC
+  headlights   KeyL
+  reset        KeyR
+  lookBack     KeyB
+  pause        Escape
+
+Rebinding:
+  SettingsPage local state `listening` holds the action being rebound.
+  A capture-phase window keydown listener records event.code (Escape cancels).
+  onChange updates settings.keys -> persisted.
+  Duplicate detection compares code values and shows a warning.
+  Engine reads this.config.keys (a snapshot taken at race start). Changing keys
+  mid-race does not apply until the next session.
+  Inputs are KeyboardEvent.code, so layout-independent and suitable for WASD.
+
+Touch:
+  RaceScreen .touch-pad (visible on coarse pointers or <=860px) calls
+  game.setVirtualInput(action, down), which resolves action -> key code and
+  adds/removes it from the internal Set. It also triggers one-shot actions
+  (camera, headlights, shifts).
+  Buttons: left, right, handbrake, brake, accelerate; shift up/down shown only
+  in manual mode.
+
+
+================================================================================
+9. ENGINE LIFECYCLE AND MAIN LOOP
+================================================================================
+
+Construction:
+  new OverdriveGame(container, config, callbacks)
+  callbacks: onHud(HudState), onFinish(RaceResult), onPause(), onReady()
+  - create RoadTrack and add its group
+  - create WorldRig (environment)
+  - create procedural PMREM environment map
+  - create player visual + 5 AI visuals (race/sprint only)
+  - create particle pools
+  - build post-processing composer (high quality only)
+  - resize, attach listeners, start audio, requestAnimationFrame
+  - expose window.__OVERDRIVE__ for debugging/QA
+
+Main loop:
+  requestAnimationFrame(loop)
+  raw = (now - last)/1000
+  if paused: update camera, render, return
+  accumulator = min(0.5, accumulator + raw)
+  while accumulator >= 1/60 and steps < 24:
+      tick(1/60)
+      accumulator -= 1/60
+      steps++
+  if steps === 0: updateCamera(raw)
+  render()
+
+render():
+  composer.render() on high quality, else renderer.render()
+
+tick(dt):
+  - world.update (sun follows player, clouds, rain)
+  - elapsed += dt while racing
+  - countdown / racing / finished phase logic
+  - updatePlayer, updateRivals, resolveCollisions
+  - audio.updateEngine
+  - visual wheel spin/steer, body roll/pitch/bob
+  - particles, camera, HUD snapshot ~20 Hz
+
+Phase:
+  "countdown" 3.2 s; countdown numbers; audio beeps; throttle can be held.
+  "racing" simulation runs, clock runs.
+  "finished" player slows; results callback after 1.2 s.
+
+Pause/resume/restart:
+  pause() sets paused, clears keys, mutes engine, resets clock.
+  resume() clears accumulator, unmutes.
+  restart() resets player/rivals/phase/timers/audio but keeps scene.
+
+Dispose:
+  cancel RAF, clear finish timer, remove all listeners, disconnect observers,
+  dispose geometries/materials/particles/composer/renderer, force context loss,
+  remove canvas, clear scene. Always call when leaving the race.
+
+Resize:
+  resize() bound arrow, called by window resize, orientationchange,
+  fullscreenchange and ResizeObserver. Canvas always matches container.
+  Drawing buffer pixel ratio: high <=2, medium <=1.5, low 1.
+
+HUD snapshot every ~0.05 s contains:
+  speed km/h, rpm normalized, gear string/number, redline, fuel, damage,
+  position, totalRacers, lap, totalLaps, time, lapTime, bestLap, countdown,
+  drifting, driftAngle, driftScore, mode, weather, timeOfDay, carName,
+  trackName, wrongWay, checkpoint/message, standings[], minimap[], camera,
+  boosting (always false — no nitro system in OVERDRIVE), topSpeed, sector,
+  traction, message.
+
+
+================================================================================
+10. DRIVING PHYSICS — EXACT MODEL (src/overdrive/engine.ts)
+================================================================================
+
+Units: metres, seconds, kilograms, radians. Forward is +Z at heading 0.
+
+State (PlayerState):
+  pos Vector3, vel Vector3 (world), heading (yaw), index (nearest road sample),
+  progress 0..1, lap, lapStart, bestLap, sector bitmask, crossedLine,
+  finished, finishTime, spin (wheel rotation accumulation), steering -1..1,
+  gear (0 = reverse, 1..N), rpm, shifting timer, throttle 0..1, brake 0..1,
+  handbrake, drifting, driftScore, driftTime, damage 0..100, fuel 0..100,
+  topSpeed, wrongWay, wallCooldown, carCooldown, offRoad, headlights, traction.
+
+Axes:
+  forward = (sin(heading), 0, cos(heading))
+  right   = (cos(heading), 0, -sin(heading))
+  forwardSpeed = vel · forward
+  lateralSpeed = vel · right
+
+Input smoothing:
+  throttle = damp(throttle, accelerate ? 1 : 0, 9, dt)
+  brake    = damp(brake,    brakeKey ? 1 : 0, 12, dt)
+  steerInput = (left ? 1 : 0) - (right ? 1 : 0)   (times min(1.25, sensitivity))
+  steering  = damp(steering, steerInput, handbrake ? 11 : 7.5, dt)
+
+Surface grip:
+  baseGrip   = car.grip * surfaceGrip()
+  surfaceGrip = SURFACE_GRIP[weather] * track.grip
+  SURFACE_GRIP = clear 1.0, sunset 0.98, overcast 0.92, rain 0.76, night 0.9
+  onRoad = !offRoad (offRoad when |lateral offset| > halfWidth - 1.0)
+  surfaceMul = onRoad ? 1 : 0.58
+  grip = baseGrip * surfaceMul * (handbrake ? 0.16 : 1) * (assists ? 1.06 : 1)
+
+Reverse:
+  From standstill with brake held and no throttle -> gear = 0.
+  Reverse acceleration: -3.2 m/s² * brake (limited to -12 m/s).
+  Forward motion with brake and no throttle exits reverse to gear 1.
+
+Automatic gearbox:
+  rpm = rpmForGear(gear, |forwardSpeed|)
+  upshift when rpm > redline * 0.95, gear < count, throttle > 0.15,
+    shifting timer <= 0 -> gear++, shifting = 0.18
+  downshift when rpm < idle + 500, gear > 1 -> gear--, shifting = 0.16
+  at standstill with brake and no throttle -> gear = 0 (reverse)
+
+Manual gearbox:
+  shift(±1) via keys (E/Q by default)
+  blocked while shifting timer > 0 or in reverse
+  blocked if upshifting would put rpm below idle + 200 while speed < 8 m/s
+  sets shifting = 0.2 and updates rpm
+
+RPM:
+  wheelRps = speed / (2π * wheelRadius)
+  rpmForGear = wheelRps * 60 * finalDrive * gearRatio
+  At speed < 6 m/s with gear >= 1: rpm approximated from throttle.
+  During shift: rpm forced to idle + 0.35 * (redline - idle).
+  rpm damped toward target with lambda 9, clamped idle..redline.
+  rpmNorm = (rpm - idle) / (redline - idle), clamped 0..1.
+
+Torque and drive force:
+  torqueCurve = 0.6 + 0.4 * sin(π * min(1, rpmNorm * 0.9 + 0.08))
+  gearRatio = gears[gear-1] (3.2 in reverse)
+  driveForce = torque * torqueCurve * gearRatio * finalDrive * 0.78 / wheelRadius
+    (N; 0.78 is the overall drivetrain efficiency factor)
+
+Longitudinal:
+  engineFactor = fuel > 0.5 ? 1 : 0
+  damageFactor = damage enabled ? 1 - min(0.35, damage * 0.0035) : 1
+  axial += (driveForce / mass * throttle * engineFactor * damageFactor
+            - brake * brakePower * 10.5) * dt     [gear >= 1]
+  reverse branch subtracts brake * 2.2 * dt
+  coasting: axial *= exp(-0.55 * dt) when no throttle/brake
+  handbrake: axial *= exp(-0.45 * dt)
+  topMs = topSpeed / 3.6
+  dragK = driveForce * 0.82 / (mass * topMs²)
+  axial -= dragK * axial * |axial| * dt        (aero drag, tuned to topMs)
+  axial -= (0.18 + (onRoad ? 0 : 1.8)) * sign(axial) * dt   (rolling resistance)
+  axial -= roadTangentY * 9.81 * 0.42 * dt     (slope gravity)
+  axial = min(axial, topMs)
+  (There is no nitro/boost system in OVERDRIVE; HudState.boosting is false.)
+
+Steering/yaw:
+  speedRatio    = clamp(|axial| / topMs, 0, 1)
+  steerAuthority= clamp(|axial| / 5.5, 0, 1)      (no steering at standstill)
+  yaw = steering
+        * 1.32
+        * car.handling
+        * steerAuthority
+        * (1 - speedRatio * 0.46)
+        * (handbrake ? 1.38 : 1)
+        * (gear < 1 ? -1 : 1)
+        * (assists ? 0.94 : 1.02)                  [rad/s]
+
+Momentum/drift model (critical):
+  worldX = forward.x * axial + right.x * lateral
+  worldZ = forward.z * axial + right.z * lateral
+  heading += yaw * dt
+  recompute forward/right from new heading
+  newForward = world · forward
+  newLateral = world · right
+  newLateral *= exp(-grip * 0.82 * dt)            (tyre scrub)
+  counter-steer if |newLateral| > 3.5 and steering != 0:
+      heading += sign(newLateral) * -0.14 * |steering| * dt
+      recompute forward/right and reproject world velocity
+  assists: if |newLateral| > 3.5 and throttle > 0.2 -> newLateral *= 0.9
+  traction = (newLateral / max(1, |newForward|)) * 100    (for HUD/drift angle)
+  vel = forward * newForward + right * newLateral
+  pos += vel * dt
+
+Collisions and bounds:
+  index = nearestIndex(pos, index)
+  lateral offset from road centre measured against sample.side
+  offRoad = |offset| > halfWidth - 1.0
+  wallLimit = halfWidth + 1.25
+  if |offset| > wallLimit:
+      push back to wallLimit along inward normal
+      impact = vel · outwardNormal
+      if impact > 0: vel -= outwardNormal * impact * 1.22   (restitution 22%)
+      vel *= 0.78
+      sparks, camera shake and crash audio if impact > 2.2 and cooldown <= 0
+      damage enabled: damage += |impact| * 0.9 (cap 100)
+      messages at damage > 45 and > 75
+  wallCooldown 0.45 s, carCooldown 0.5 s
+  pos.y damped to road centre y + 0.02 (lambda 16)
+
+Wheel rotation:
+  spin += (newForward / wheelRadius) * dt
+  visual setSpin(spin) sets wheel.spin.rotation.x = -spin
+  (Do not change to Z. See Section 11.)
+
+Fuel, damage and drift:
+  fuel -= dt * (0.006 + throttle * 0.05 + rpmNorm * 0.03), min 0
+  low fuel message below 12
+  drifting = racing && |forward| > 9 && (|lateral slip| > 2.3 ||
+             (handbrake && |forward| > 12))
+  while drifting: driftScore += (|slip| * 12 + |forward| * 0.9) * dt,
+                  slight fuel recharge
+  otherwise driftScore decays 14/s
+  damage shown only if config.damage
+
+AI (updateRivals):
+  5 rivals only in race and sprint; none in time trial/drift.
+  Curvature look-ahead: max over 16 samples starting at
+    lookSteps = round((12 + speed * 0.55) / 2.4)
+  cornerLimit = (spec.topSpeed / 3.6) * (1 - clamp(curve * 290, 0, 0.52))
+                * surfaceGrip()
+  target = cornerLimit * skill * rubberBand
+  rubberBand = 1 + clamp((playerScore - aiScore) * 0.09, -0.05, 0.09)
+  accelerate at (torque / mass) * 2.4, brake at 14 m/s²
+  lane sway via sin, steering eases toward a look-ahead point (max 1.6 rad/s)
+  lap counting on wrapped index crossing (crossedStart guard)
+
+Car-to-car:
+  separation radius 2.4 m, push apart, transfer velocity, audio/shake/damage.
+
+Camera:
+  chase: distance 7.4 (portrait 9.6), height 2.25; far: 12 m / 3.4 m
+  hood: +0.9 m forward, 1.15 m up, look 24 m ahead
+  cockpit: per-car eye point from CAR_DESIGNS.cockpit via localPoint
+  countdown orbit camera, paused orbit camera, lookBack inverts the shot
+  camera clamped inside circuit width and above road
+  FOV 58 + speedRatio * 8 + drift 2, damped
+  Camera shake added on impacts.
+
+Race rules:
+  totalLaps = sprint ? 1 : drift ? 3 : track.laps
+  Start grid: player at samples.length - 6; AI staggered behind.
+  First start-line crossing (prev > 0.78 && current < 0.22) opens lap 1.
+  A lap counts only if both sector gates (34% and 67%) were passed.
+  Race finishes when lap >= totalLaps; finishRace builds standings and result.
+
+
+================================================================================
+11. WHEEL SYSTEM — INVARIANTS (DO NOT BREAK)
+================================================================================
+
+The wheel bug in earlier builds: the tyre axle was aligned to X, but the spin
+group was rotated on Z, producing a sideways-spinning wheel. This was fixed.
+
+Hierarchy (per wheel):
+  root
+   └── steer group      position = (side * track/2, wheelRadius,
+                                    front ? +wheelbase/2 : -wheelbase/2)
+        ├── spin group   rotation.x = -spinAngle
+        │    ├── tyre mesh (CylinderGeometry rotated so axle = local X)
+        │    ├── rim barrel, rim face, spokes, bolts, lip
+        ├── brake disc   (child of steer, does NOT spin)
+        └── brake caliper(child of steer, does NOT spin)
+
+Rules:
+  1. Four wheels, two front and two rear.
+  2. Steering affects only front `steer.rotation.y`.
+  3. Rear steer rotation.y stays 0.
+  4. Rolling affects only `spin.rotation.x`.
+  5. `spin.rotation.y` and `.z` must remain 0.
+  6. Wheel centre height = design.wheelRadius (ground contact).
+  7. Track width = design.track; wheels sit slightly outside the body.
+  8. Wheels must remain children of the vehicle root; never reparented.
+  9. Rolling rate = forward speed / wheelRadius (metres per second).
+ 10. Do not reintroduce the huge opaque arch liner that hid the tyre.
+ 11. Brake disc/caliper are unsprung; do not attach them to `spin`.
+ 12. Wheel styles and sizes come from CAR_DESIGNS; do not hard-code one size.
+
+Debug API (window.__OVERDRIVE__):
+  debugWheels() returns for each wheel:
+    { front, side, steerY, spinX, contactY, radius, position[3] }
+  contactY is world Y minus radius (world Y is track elevation, so use local
+  positions for exact ground-contact checks; local steer.position.y equals
+  radius by construction).
+
+Verified assertions (headless, live gameplay):
+  four wheels, all attached, 2 front/2 rear, local Y == radius,
+  front axle at +wheelbase/2, rear at -wheelbase/2, track width consistent,
+  front steers on Y, rear does not, spin on X only, no Z spin,
+  spin changes with speed, zero console errors.
+
+Garage viewer:
+  VehicleViewer uses its own renderer and studio scene. It shows the live
+  procedural model, turntable ring, shadows and four preset angles. Pointer
+  drag orbits, wheel zooms. It reads CAR_DESIGNS and carModel; keep them
+  compatible with any future geometry changes.
+
+Model studio:
+  Open `<live-url>#models`. Lists all cars, quality presets, angle controls,
+  dimensions. Use it to inspect every model before and after changes.
+
+
+================================================================================
+12. VEHICLE GEOMETRY — HOW IT IS BUILT
+================================================================================
+
+Body:
+  - `design.top` is a list of [z, y] points from nose to tail.
+  - A THREE.SplineCurve smooths them into ~85 points.
+  - A THREE.Shape is built from the top profile plus the bottom (lowerY) and
+    the cut-outs for both wheel arches. `fromRearToFront` inserts the arch arcs
+    in ascending z order so the shape remains valid.
+  - ExtrudeGeometry with bevel (segments 3, small bevel) gives a round-edged
+    body; rotated -90° about Y and centred so X is width, Z is length.
+  - bodyDepth = width * 0.93; track = width + 0.06 means the wheels protrude
+    slightly, so the arches read properly.
+
+Cabin:
+  - Separate extruded shape from cabin.frontZ/rearZ, roofFrontZ/roofRearZ and
+    roofY, with cabin.width, bevel and curved front/rear.
+  - Painted in body colour.
+
+Glazing:
+  - Side panes from `design.glassFront` / `glassRear` polygons, placed just
+    outside the cabin shell; a dark backing panel ensures the window reads as
+    glass even against dark scenery.
+  - Windscreen and rear screen are quad meshes between beltline and roof.
+  - Window surrounds are Line segments; pillars are added for blacked-out cars.
+
+Details:
+  - Grille textures generated on canvas per grille type.
+  - Kidney grille gets two rounded openings with chrome slats.
+  - Headlights: swept/slim/LED/round variants, DRL strip, LED cubes for SUV.
+  - Taillights: swept/slim/round/quad; separate brake, reverse, indicator.
+  - Front/rear bumpers, splitter, diffuser, exhausts (twin/quad), wing, lip.
+  - Mirrors with glass inserts, door handles, shut lines, chrome trim option,
+    roof rails, side steps, spare wheel, hood scoop/vents, side intakes,
+    antenna.
+  - Right-hand-drive interior: dash, cluster, steering wheel, seats, console,
+    shifter, mirror, A-pillars. Interior visible only in cockpit camera.
+
+Reference mapping:
+  Swift   : red hatchback, compact, black roof/pillars, mesh grille, swept lamps.
+  City    : silver sedan, chrome bar grille, slim lamps, multi-spoke wheels.
+  Fortuner: white large SUV, tall roof, roof rails, side steps, chrome slats,
+            LED headlights, off-road-style tyres/clearance.
+  M3      : green performance sedan, kidney grille, quad exhaust, splitter,
+            diffuser, carbon roof, wide track.
+  F296    : red mid-engine supercar, low roof, centre-lock wheels, mesh grille,
+            quad taillights, diffuser, side intakes, twin exhaust.
+
+Honest limitation:
+  These are procedural interpretations, not licensed CAD or photo-scanned
+  replicas. They are distinct and recognisable by class and features, but they
+  will not match the reference renders pixel-for-pixel. Authoring proper GLB
+  meshes (Blender) and loading each through GLTFLoader is the correct next step
+  for photorealism. The per-car design pipeline is ready for that replacement.
+
+
+================================================================================
+13. CAR DATA — src/overdrive/data.ts
+================================================================================
+
+CarSpec fields:
+  id, make, model, year, category, body, color, accent, wheelColor,
+  power (hp), torque (Nm), mass (kg), drivetrain ("FWD"|"RWD"|"AWD"|"4WD"),
+  topSpeed (km/h), zeroTo100 (s), gears (ratios array), finalDrive, redline,
+  idle, grip, handling, brakePower, blurb, highlights[].
+
+Roster:
+  swift     Maruti Suzuki Swift       2024 Indian hatch   81 hp   920 kg  FWD  5-speed
+  city      Honda City                2024 Indian sedan  121 hp  1160 kg  FWD  6-speed
+  seltos    Kia Seltos                2024 compact SUV   115 hp  1310 kg  FWD  6-speed
+  fortuner  Toyota Fortuner            2024 full SUV      201 hp  2150 kg  4WD  6-speed
+  thar      Mahindra Thar             2024 off-road      150 hp  1850 kg  4WD  6-speed
+  m3        BMW M3 Competition        2024 performance   503 hp  1730 kg  RWD  8-speed
+  m5        BMW M5 Competition        2023 performance   617 hp  1900 kg  AWD  8-speed
+  gt3       Porsche 911 GT3           2023 sports        502 hp  1435 kg  RWD  7-speed
+  gtr       Nissan GT-R               2024 performance   565 hp  1750 kg  AWD  6-speed
+  f296      Ferrari 296 GTB           2023 supercar      819 hp  1470 kg  RWD  8-speed
+  wrx       Subaru WRX                2023 rally         271 hp  1580 kg  AWD  6-speed
+
+To add a car:
+  1. Add an entry to CARS in data.ts with all CarSpec fields.
+  2. Add a CarId union member in types.ts.
+  3. Add a matching design in carDesigns.ts (proportions, top profile, cabin,
+     glass, grille, lights, wheels, features, cockpit).
+  4. (Optional) add a photo/asset and map it in BODY_IMAGES.
+  5. Test in #models from all four angles, then drive it.
+  6. Verify wheelbase/track/radius vs the body so arches line up.
+
+Do not simply duplicate a car and rename it. Each must have its own proportions
+and specifications. If a real model cannot be represented, document it.
+
+Important: the active UI uses `CarId` from src/overdrive/types.ts and `CarSpec`
+from src/overdrive/types.ts. The legacy src/game/data.ts is separate.
+
+
+================================================================================
+14. TRACKS — src/overdrive/data.ts + track.ts
+================================================================================
+
+TrackDef fields:
+  id, name, location, theme ("circuit"|"coast"|"hill"|"city"), description,
+  rx, rz (horizontal radii), harmonicA, harmonicB (shape variation),
+  elevation, width, laps, lengthLabel, difficulty, weather, timeOfDay, grip,
+  accent, skyTop, skyHorizon, fog, terrain.
+
+Roster:
+  ng-speedway   Greater Noida Speedway    circuit  3 laps  width 15  dry/day
+  kari-circuit  Kari Motor Speedway       circuit  4 laps  width 12  dry/day
+  ecr-coast     East Coast Road Sprint     coast    2 laps  width 13.5 sunset
+  munnar-climb  Munnar Hillclimb          hill     2 laps  width 10.5 elevation 52
+  lonavala-ghat Lonavala Ghat Loop        hill     2 laps  width 11  rain
+  mumbai-street Mumbai City Sprint        city     3 laps  width 12  night
+
+Generation:
+  - 48 control points around a closed loop:
+      radius = 1 + harmonicA*sin(3a+0.7) + harmonicB*cos(5a+1.9)
+               + 0.45*harmonicB*sin(8a+0.2)
+      x = cos(a)*rx*radius
+      z = sin(a)*rz*radius
+      y = 2 + elevation*(0.5+0.5*sin(2a+0.5))*(theme==="hill" ? 1 : 0.5)
+  - CatmullRomCurve3 closed, tension 0.4.
+  - Samples: count = clamp(length/2.4, 380, 1400).
+  - curvature = angle between tangents 4 samples apart / arc span.
+  - nearestIndex uses ±60 sample local search when a hint is given.
+  - sampleAt(progress) interpolates positions/tangents/sides.
+  - minimap points normalised to 0..1.
+  - Road width, kerbs, barriers, arches, start gantry and checkpoints generated
+    at 34% and 67%.
+  - track.setWet(true) darkens/reflects asphalt, shows puddles, changes kerb and
+    shoulder colour.
+
+To add a track:
+  1. Add TrackDef to TRACKS in data.ts and TrackId to types.ts.
+  2. Optionally add theme-specific scenery in environment.ts.
+  3. Verify width vs car widths, checkpoint spacing, elevation smoothness,
+     camera containment and AI stability.
+  4. Test all modes on it and record best-lap save.
+
+Important note:
+  Track names reference real places, but layouts are original procedural
+  interpretations. Do not claim surveyed or officially licensed reproductions.
+
+
+================================================================================
+15. ENVIRONMENT, WEATHER, DAY/NIGHT, AUDIO
+================================================================================
+
+Environment (environment.ts):
+  - Sky: custom ShaderMaterial sphere; uniforms for top/horizon/sun colour,
+    night flag and sun direction. Sun disk and haze computed in shader.
+  - Stars at night, cloud sprites, distant mountain cones, ground plane with
+    terrain texture, instanced vegetation (trunks + crowns), rocks, palms on
+    the coast, sea/beach on coast.
+  - City blocks with emissive window textures (night), instanced buildings.
+  - Streetlights with emissive heads and point lights at night (limited count).
+  - Tyre stacks and grandstands for circuits, pit wall, road signs, braking
+    boards.
+  - Rain: 3,500 pooled points that follow the player, with reset above ground.
+  - Fog colour/intensity per track and weather.
+  - Sun follows the player so shadows remain local and stable.
+  - Quality controls vegetation count, city density, shadow map size and whether
+    shadow casting is enabled (low = no shadows).
+  - createWorld returns { group, sun, update(focus, elapsed, dt), setRain, dispose }.
+
+Weather/time:
+  Weather values: clear, overcast, rain, sunset, night.
+  TimeOfDay: day, sunset, night.
+  Race config resolves "track" to the circuit default. Night weather forces
+  night time; sunset weather forces sunset.
+  Rain sets the track wet, adds rain particles and reduces grip.
+  Lights: player headlights toggle (L) and are auto-on at night; AI lights are
+  emissive only (spotlights only for the player to limit light count).
+
+Audio (audio.ts):
+  - One AudioContext per page (singleton via getDriveAudio()).
+  - Created/resumed on a user gesture (priming happens from App actions).
+  - Buses: master -> destination; music, sfx, engine -> master.
+  - Engine: 3 oscillators through a lowpass filter plus a sine sub and noise
+    layers for road/wind/rain/tyre squeal.
+  - updateEngine params: rpm, redline, throttle, speed, gear, shifting,
+    drifting, rain, surfaceGrip, engineLoad.
+  - Gear up triggers a shift pop; near redline triggers a limiter blip.
+  - SFX: countdown, UI click/confirm/back, checkpoint, lap, shift indicator,
+    crash, finish sting.
+  - Music: generated four-chord progression loop, not a licensed track.
+  - Settings master/music/sfx applied via setSettings.
+  - dispose() closes the context; engine mute is used when paused/exiting.
+  - Known limitation: engine note is parameterised by RPM/gear but not by a
+    per-car sample or cylinder count. Extending: add per-car timbre data and
+    vary oscillator types/harmonics/filter curves.
+
+Particles (src/game/particles.ts):
+  ParticlePool(max, additive) with shader-based points, fixed buffers.
+  Engine uses 3 pools: smoke (220), spray (320), sparks (160).
+  Emission: drifting/handbrake, wet spray at speed, off-road dust, wall sparks.
+  Call update(dt) each frame; dispose on exit.
+
+
+================================================================================
+16. UI/UX AND DESIGN SYSTEM
+================================================================================
+
+Palette (src/index.css):
+  --bg #0a0b0d, --panel #14161a, --panel-2 #1a1d21,
+  --line rgba(255,255,255,.09), --line-strong rgba(255,255,255,.18),
+  --ink #f1f0ea, --muted #989c9f,
+  --accent #e04b2a (racing red), --gold #c9a468, --green #7ba883,
+  --amber #d8a33f, --red #cf4a3c.
+
+Typography:
+  Display: Barlow Condensed (condensed uppercase).
+  Body: Inter.
+  Numerals: Rajdhani / tabular numbers.
+  Loaded from Google Fonts in index.html; fallbacks declared.
+
+Layout:
+  .page-container: max-width 1460px, auto margins, fluid horizontal padding
+  (clamp 1.05rem..2.8rem).
+  Sticky .site-header with nav, GitHub link, sound, Drive button.
+  Mobile nav: 5-column grid, 320px tested, no overflow.
+  Document scrolling, not nested fixed-height containers. Screens use
+  min-height: 100dvh and overflow-x: clip.
+
+Key components:
+  .panel, .panel-flat, .panel-header, .chip variants, .btn variants
+  (primary/outline/ghost/danger), .mode-tab, .car-card, .track-card,
+  .track-map, .tabs/.tab, .setting-row, .switch, .rebind-btn, .keycap,
+  .range, .select, .input.
+  Garage viewer fills a 380px panel with overlay labels and angle buttons.
+  HUD: .race-shell, .race-canvas, .hud, .hud-panel, .hud-label, .hud-num,
+  .gear-box (redline state), .tacho-seg, .drift-badge, .toast, .start-light,
+  .countdown-ring, .touch-pad/.touch-btn, .hud-exit.
+  Pause/overlay: .overlay; results: .results-wrap, .result-row.
+  Effects: .speed-vignette, .drift-vignette, .rain-overlay.
+  Responsive: <=1280 hide standings, <=900 hide speed panel/minimap shrink,
+  <=860 show touch pad, <=400 shrink touch, max-height 700 hide compact panels,
+  reduced-motion support.
+
+Screens:
+  Home, Garage, Tracks, Settings, About, RaceScreen (+HUD/pause),
+  Results, ModelStudio (#models).
+
+External links:
+  Portfolio, Instagram, email, GitHub, Play Live. All external links use
+  target="_blank" rel="noopener noreferrer"; email uses mailto:.
+
+Accessibility:
+  Buttons have aria-labels; switches use role="switch"/aria-checked; keyboard
+  focus outlines; canvas has aria-label; reduced-motion CSS; rebind buttons show
+  listening state. Known gaps: no full focus trap in pause overlay, no explicit
+  text-scaling control, colour-only status in some HUD chips.
+
+
+================================================================================
+17. RACE MODES, PROGRESSION, SAVE DATA
+================================================================================
+
+Modes:
+  race   Circuit Race — AI opponents, full race distance, classification.
+  time   Time Trial   — no AI, lap timing, personal best.
+  sprint Sprint       — 1 lap, AI opponents, classification.
+  drift  Drift Attack — no AI, 3 laps, drift score.
+
+AI count = 5 for race and sprint; 0 for time and drift.
+Total laps = sprint 1; drift 3; otherwise track.laps.
+Sector gates at 34% and 67%; start line crossing opens lap 1.
+Finish classification sorts finished racers by finish time, then unfinished by
+race score (lap + progress).
+
+Persistence:
+  overdrive-settings-v1 — Settings object (see Section 8).
+  overdrive-profile-v1  — { bestLaps, driftBest, wins, races }.
+  Best lap is saved only if lower than previous. Drift score only if higher.
+  Reset data removes the profile only.
+  There is no export/import save UI yet. No cloud sync. Clearing browser data
+  deletes progress. The UI warns about this in Settings -> Data.
+
+No economy, no dealership, no career progression, no achievements screen.
+Do not add fake versions of these. Add real systems or leave them out.
+
+
+================================================================================
+18. TESTING — WHAT WAS RUN, HOW TO REPRODUCE
+================================================================================
+
+Environment used:
+  Headless Chromium (Chrome for Testing 148, SwiftShader WebGL2) via Puppeteer.
+  The sandbox did not ship the required Chromium shared libraries, so Debian
+  packages were downloaded and extracted into /tmp/chromelibs, then Chromium was
+  launched with:
+    LD_LIBRARY_PATH=/tmp/chromelibs/usr/lib/x86_64-linux-gnu:/tmp/chromelibs/lib/x86_64-linux-gnu
+  Packages: libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libdbus-1-3
+  libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libxkbcommon0
+  libasound2 libatspi2.0-0 libcups2 libcairo2 libpango-1.0-0 libxcb1 libx11-6
+  libxext6 libxi6 libxrender1 libexpat1 libglib2.0-0 libdrm2
+  libwayland-server0 libwayland-client0.
+  On a normal machine, install Google Chrome and run Puppeteer normally; this
+  workaround is sandbox-specific.
+
+Serving the build:
+  cd dist && python3 -m http.server 8090
+  Then open http://127.0.0.1:8090/
+  (Several QA scripts assume this port. Adjust as needed.)
+
+Debug hooks (available in development and production):
+  window.__OVERDRIVE__ is the OverdriveGame instance.
+  Useful methods/properties:
+    phase, paused, config, spec, track, player, rivals, playerVisual, camera,
+    cameraMode, totalLaps, elapsed, keys (Set of KeyboardEvent.code)
+    pause(), resume(), restart(), setQuality(quality), cycleCamera()
+    setVirtualInput(action, down)  // action is a key of KeyBindings
+    getHudForDebug()
+    debugStep(dt)                  // advance one simulation step
+    debugState()                   // phase, pos, speed, gear, rpm, slip, etc.
+    debugWheels()                  // wheel transforms and ground-contact data
+    debugFastForward(seconds)      // autopilot through the real simulation
+  These are intended for testing. Do not remove without updating tests.
+
+Current QA scripts in scripts/ (not all are current):
+  od-test.mjs        menu -> garage -> tracks -> settings -> race -> results flow
+  od-dynamics.mjs    manual/auto driving, steering, handbrake, cockpit, pause,
+                     mobile layout; uses debugFastForward
+  od-sprint.mjs      one-lap Sprint end-to-end to the results screen
+  od-final.mjs       defaults + autopilot (full race may exceed headless budget)
+  wheel-local.mjs    wheel hierarchy/axle/rotation/ground-contact assertions
+  model-shots.mjs    renders every reference car from four angles -> screenshots/models
+  layout-test.mjs    alignment, scrolling and overflow at multiple viewports
+  attribution-visual.mjs  developer links and About page checks
+  Older scripts (test-game, qa-suite, capture, etc.) target the previous
+  NEON RUSH build and may be stale. Prefer the od-* scripts and wheel-local.mjs.
+
+Test results (latest):
+  - `npx tsc --noEmit`: PASS.
+  - `npm run build`: PASS, single file ~2.74 MB / ~1.53 MB gzip.
+  - Home/Garage/Tracks/Settings/About: render, 11 cars, 6 circuits, no overflow.
+  - Key rebinding: persists to localStorage (verified ArrowUp on accelerate).
+  - Manual gearbox + cockpit camera: propagate to race config; cockpit interior
+    visible; chase restores exterior.
+  - Headlights, camera cycling, pause overlay: PASS.
+  - Sprint event: completes, classified 2nd, results screen, PB saved, no errors.
+  - Wheel mechanics: four wheels, two front/two rear, attached, correct track,
+    correct wheelbase positions, ground contact at radius, front-only steering,
+    spin about X only, no Z spin, spin changes with speed: PASS.
+  - Mobile 390x844: no horizontal overflow, touch controls flex, HUD inside
+    viewport.
+  - Console: 0 errors in final runs.
+  - Model studio: all 11 cars render; reference cars captured from front, side,
+    rear and 3/4 in screenshots/models/.
+
+What was NOT validated end-to-end:
+  - Full multi-lap races with the automated harness (software rendering made the
+    session too slow). Sprint was validated end-to-end instead. A real browser
+    playtest of a 3-lap race is recommended.
+  - Real-GPU frame rate and thermal performance.
+  - Actual GitHub Actions deployment (no repo/credentials in this environment).
+    The build was served from a simulated repository subpath and tested.
+  - Safari/Firefox compatibility; only Chromium was available.
+  - The racing-line setting has no visual implementation yet (UI only).
+  - Fuel cannot be refilled in-session; low-fuel warning only.
+  - Car damage is numeric and affects power; no visual deformation or panel
+    damage is implemented.
+  - No cockpit-specific interior per car; the interior structure is shared with
+    different belt/roof heights.
+  - Vehicle geometry accuracy is stylised/procedural, not photo-exact.
+
+
+================================================================================
+19. KNOWN ISSUES / BUGS
+================================================================================
+
+1. Vehicle models are recognisable procedural interpretations, not exact
+   replicas of the reference renders. Highest-priority visual gap.
+2. The "Show racing line" setting is present but not applied to the road.
+   Either implement it or remove the toggle to avoid a fake setting.
+3. Full race distances are not covered by automated end-to-end tests.
+4. Fuel has no refill mechanism; long sessions run dry.
+5. `HudState.boosting` always false (no nitro system). Remove the field or
+   implement a real system before displaying boost UI.
+6. The legacy NEON RUSH modules still exist in src/game/ and increase the
+   repository size/confusion. They can be pruned after checking imports.
+7. No save export/import or multi-profile support.
+8. No online multiplayer, career, dealership, economy or achievements. Do not
+   present UI for these unless implemented.
+9. AI difficulty is not user-selectable.
+10. The fullscreen API must be triggered by a user gesture; the settings button
+    does so. Browser support varies.
+11. Headless software WebGL produces lower-fidelity screenshots than a real GPU;
+    appearance of bloom/wet reflections may differ.
+12. External Google Fonts may be blocked; fallback fonts are used.
+13. The black wheel-arch liner was removed because it occluded the wheel. If
+    adding a new liner, keep it behind the tyre and smaller than the arch.
+14. Steering in the cockpit: front wheels visually turn up to ~24° through
+    `steer.rotation.y`; verify after changing handling or wheel geometry.
+15. The archive of screenshots includes some pre-rebuild models under
+    screenshots/models/*.png (v1/front/side) and newer *-v2.png. Use the v2 files
+    as current reference for the rebuilt geometry.
+
+
+================================================================================
+20. PRIORITISED NEXT STEPS
+================================================================================
+
+P0 — Accuracy of the hero cars
+  - Author or license accurate GLB meshes for the five reference cars (Swift,
+    City, Fortuner, M3, 296 GTB), with separate wheel nodes and LODs.
+  - Load them with GLTFLoader, map body/glass/tyre/rim/light materials, and swap
+    into VehicleVisual while preserving the wheel hierarchy rules in Section 11.
+  - Keep procedural models as fallbacks.
+  - Test each in #models and in-game from all angles, then drive.
+
+P1 — Gameplay verification
+  - Run full 3-lap races manually and via harness on every track.
+  - Tune AI pace per track; verify classification and laps for all cars.
+  - Test mobile touch steering/throttle continuously, not just presence.
+
+P2 — Realism and feel
+  - Suspension visual travel from road samples (body already follows y; add
+    per-wheel compression and wheel contact adaptation).
+  - Better tyre model: separate front/rear slip, temperature, wear.
+  - Manual clutch and rev-match; engine braking refinement.
+  - Per-car engine timbre in audio.
+  - Implement the racing line or remove the setting.
+
+P3 — Content
+  - Add more cars only with distinct data and designs.
+  - Add circuits with verified geometry, unique scenery and surface types.
+  - Add career/time-trial ghosts/local leaderboards.
+
+P4 — Deployment/operations
+  - Push to GitHub, enable Pages, verify Actions, set repository description
+    and topics from REPO_DESCRIPTION.txt.
+  - Add a LICENSE file after deciding terms.
+  - Add automated CI tests (Playwright) if desired; CI currently type-checks and
+    builds only.
+
+Do not start with extra menus or effects. Vehicle accuracy and driving quality
+take priority.
+
+
+================================================================================
+21. HOW TO ADD A NEW SCREEN OR MODE (CHECKLIST)
+================================================================================
+
+New screen:
+  1. Add the name to ScreenName in src/overdrive/types.ts.
+  2. Create src/overdrive/ui/YourScreen.tsx using Header/Footer/SectionTitle.
+  3. Add a case in src/App.tsx render() and a navigation link in
+     src/overdrive/ui/common.tsx (desktop + mobile nav).
+  4. Scroll to top on navigation (effect in App already handles all screens).
+  5. Test keyboard focus, overflow at 320/390/768/1366/1920 widths, and links.
+
+New mode:
+  1. Add to RaceMode in types.ts and MODES in data.ts with real description.
+  2. Handle total laps / AI count / timing in engine.ts.
+  3. Add HUD text and results presentation.
+  4. Add a completion path that produces RaceResult.
+  5. Only expose it in the Home mode selector once it can be completed.
+  6. Add a QA script that finishes it.
+
+New car:
+  See Section 13.
+
+New track:
+  See Section 14.
+
+New key action:
+  1. Add to KeyBindings and DEFAULT_KEYS in types.ts.
+  2. Add to KEY_ACTIONS for the rebinding UI.
+  3. Handle in engine onKeyDown / setVirtualInput.
+  4. Add a touch button if it is needed while driving.
+  5. Test conflict detection and persistence.
+
+
+================================================================================
+22. SECURITY, PRIVACY, LICENSING
+================================================================================
+
+- No backend, accounts, API keys, analytics or cloud calls at runtime.
+- No external CDN required for gameplay; Google Fonts is optional styling.
+- Progress is stored in localStorage and is not encrypted. It contains only lap
+  times, event counts and settings; no personal data.
+- Reset data is available in Settings -> Data with a confirmation step.
+- All vehicle names/marques belong to their owners. They are used descriptively
+  to identify the real models that inspired the in-game cars.
+- OVERDRIVE is unofficial and not affiliated with or endorsed by any manufacturer
+  or motorsport venue.
+- Cars, tracks, textures, code and audio are original procedural/AI-assisted work
+  for this project. Do not claim licensed assets.
+- No LICENSE file exists yet. Add one before redistribution or contributions.
+- Do not add copyrighted music, logos, vehicle scans or ripped assets.
+- If replacing procedural cars with licensed GLB models, record source, author,
+  licence and attribution in ASSETS.md (create the file) and keep the official
+  names only if permitted.
+- The developer's personal details must stay exactly as supplied in Section 1.
+
+
+================================================================================
+23. HAND-OFF RULES — READ BEFORE CHANGING ANYTHING
+================================================================================
+
+1. Do not break the wheel hierarchy or rotation axes. Re-run wheel-local.mjs
+   assertions after any change to carModel.ts.
+2. Do not replace per-car geometry with one shared model. Cars must stay
+   visually and physically distinct.
+3. Do not add fake buttons, fake modes, fake multiplayer, fake economy or
+   placeholder cars labelled as final.
+4. Keep the game fully static and GitHub Pages compatible. No backend, secrets,
+   base-path assumptions, or absolute asset paths.
+5. Keep the design tokens in src/index.css. Do not reintroduce neon/cyberpunk
+   styling; OVERDRIVE is realistic/automotive.
+6. Keep all new external links with rel="noopener noreferrer" and target=_blank
+   (except mailto:).
+7. Keep the exact developer attribution in Section 1. Do not invent details.
+8. When adding UI for a feature, implement it first. If it cannot be completed,
+   hide it and document the limitation.
+9. Test with `npx tsc --noEmit`, `npm run build`, a browser run, and mobile
+   viewport before claiming completion.
+10. Update working.txt, README.md and docs/TESTING.md when features or limitations
+    change. This file is the contract for the next agent.
+11. If a change affects the live URL or repository name, update every location
+    listed in Section 3.
+12. Preserve the fixed 60 Hz simulation and the physics model. Tune constants
+    rather than replacing the model without documentation and tests.
+
+
+================================================================================
+24. QUICK COMMANDS
+================================================================================
+
+Install/run:
+  npm install
+  npm run dev
+  npm run build
+  npm run preview
+  npx tsc --noEmit
+
+Verify production build from a simulated Pages subpath:
+  rm -rf /tmp/site && mkdir -p /tmp/site/overdrive
+  cp dist/index.html /tmp/site/overdrive/index.html
+  touch /tmp/site/overdrive/.nojekyll
+  cd /tmp/site && python3 -m http.server 8099
+  # open http://127.0.0.1:8099/overdrive/
+
+Deploy:
+  git init
+  git add .
+  git commit -m "OVERDRIVE — realistic browser driving game"
+  git branch -M main
+  git remote add origin https://github.com/asif4517-git/overdrive.git
+  git push -u origin main
+
+Set metadata (GitHub CLI authenticated):
+  gh repo edit asif4517-git/overdrive \
+    --homepage "https://asif4517-git.github.io/overdrive/" \
+    --description "$(cat REPO_DESCRIPTION.txt | sed -n '25,31p' | tr '\n' ' ')" \
+    --add-topic driving-game --add-topic racing-game --add-topic car-simulator \
+    --add-topic threejs --add-topic react --add-topic typescript --add-topic vite \
+    --add-topic webgl --add-topic github-pages --add-topic browser-game \
+    --add-topic procedural-generation --add-topic game-development \
+    --add-topic asif4517-git
+
+  (Or run scripts/set-repo-metadata.sh for the maintained version.)
+
+Model studio:
+  https://asif4517-git.github.io/overdrive/#models
+  or http://localhost:5173/#models
+
+Browser QA (example):
+  cd dist && python3 -m http.server 8090
+  node scripts/od-sprint.mjs
+  node scripts/wheel-local.mjs
+  node scripts/model-shots.mjs
+
+
+================================================================================
+25. READY-TO-PASTE PROMPT FOR THE NEXT AI AGENT
+================================================================================
+
+Copy the text between the lines into a new development session:
+
+--------------------------------------------------------------------------
+You are continuing OVERDRIVE, a realistic browser driving game by Asif.
+Read working.txt in full before making changes. It is the authoritative
+handover for architecture, physics, data models, wheel conventions, testing
+and deployment.
+
+Owner/creator attribution (use exactly, invent nothing):
+  Asif
+  https://asif4517-git.github.io/
+  @asif_xrk — https://instagram.com/asif_xrk
+  asifsrk4517@gmail.com
+
+Repository target: https://github.com/asif4517-git/overdrive
+Live target:       https://asif4517-git.github.io/overdrive/
+
+Current state:
+- React 19 + TypeScript + Vite + Three.js, single-file build, GitHub Pages ready.
+- 11 cars, 6 circuits, 4 modes, auto/manual gearbox, weather, day/night,
+  chase/wide/hood/RHD cockpit cameras, rebindable keys, local saves.
+- Wheels were rebuilt: steer pivot on Y at the front axle, tyre axle on X,
+  rolling on rotation.x only, brake calipers unsprung, four attached wheels.
+- Production build and TypeScript pass; browser tests and wheel assertions pass.
+- Main visual gap: car bodies are procedural, recognisable interpretations, not
+  photo-exact replicas of the five reference renders.
+
+Priorities:
+1. Replace the five hero cars (Swift, City, Fortuner, M3, 296 GTB) with accurate
+   GLB/CAD-quality meshes loaded via GLTFLoader, preserving the wheel hierarchy
+   rules in working.txt Section 11. Keep procedural models as fallbacks.
+2. Run a real full-race playtest on every track and verify laps, AI and results.
+3. Implement or remove the racing-line setting. Refine suspension visuals and
+   per-car audio.
+4. Improve realism without regressing performance or the fixed 60 Hz simulation.
+
+Rules:
+- Do not break gameplay, controls, UI, GitHub Pages compatibility or attribution.
+- No backend, account, API keys or fake multiplayer/economy.
+- No fake completion claims. Test and document.
+- Update working.txt, README.md, docs/TESTING.md and REPO_DESCRIPTION.txt when
+  URLs, features or limitations change.
+--------------------------------------------------------------------------
+
+
+================================================================================
+26. CHANGE LOG (SUMMARY)
+================================================================================
+
+- Built NEON RUSH arcade racer (legacy code remains in src/game/).
+- Added developer attribution, About page, Settings data tab, metadata.
+- Added GitHub Actions Pages deployment, .nojekyll, deployment guide.
+- Replaced the neon arcade presentation with the realistic OVERDRIVE build:
+  new UI, 11 real cars, 6 circuits, gearbox, weather, cockpit, rebindable keys.
+- Fixed simulation clock to a fixed 60 Hz step.
+- Rebuilt vehicle geometry with per-car silhouettes and wheel arches.
+- Fixed the wheel spin axis bug (X instead of Z), separated steering pivot and
+  spin group, moved brake calipers off the spinning wheel, grounded wheels at
+  wheel radius, derived RPM from wheel radius.
+- Added live 3D garage viewer, four angle presets and #models model studio.
+- Added GitHub repository configuration, site/live URL centralisation, README
+  Play Live button, REPO_DESCRIPTION.txt, GITHUB_PAGES.md, metadata script and
+  this handover.
+- Current status: playable and build-verified; vehicle photorealism remains the
+  main outstanding improvement.
+
+
+================================================================================
+END OF WORKING FILE
+================================================================================
+Created and developed by Asif.
+Portfolio: https://asif4517-git.github.io/
+Instagram: @asif_xrk — https://instagram.com/asif_xrk
+Email: asifsrk4517@gmail.com
+================================================================================

@@ -1,0 +1,148 @@
+{
+  "started": true,
+  "boot": {
+    "phase": "racing",
+    "car": "RONIN EVO",
+    "track": "docks"
+  },
+  "midrace": {
+    "speed": 150,
+    "lap": 0,
+    "position": 6,
+    "progress": 0.026
+  },
+  "quality": [
+    {
+      "setting": "low",
+      "engineQuality": "low",
+      "bloom": false,
+      "shadows": false
+    },
+    {
+      "setting": "medium",
+      "engineQuality": "medium",
+      "bloom": true,
+      "shadows": true
+    },
+    {
+      "setting": "high",
+      "engineQuality": "high",
+      "bloom": true,
+      "shadows": true
+    }
+  ],
+  "fullRace": {
+    "events": [
+      "lap 1 @ 64.87s (best 64.87)",
+      "lap 2 @ 116.53s (best 51.67)",
+      "lap 3 @ 174.53s (best 51.67)",
+      "phase racing -> finished"
+    ],
+    "phase": "finished",
+    "position": 6,
+    "lap": 3,
+    "lapTime": 0,
+    "time": 174.5333333333264,
+    "bestLap": 51.66666666666373,
+    "topSpeed": 211.9679999897167,
+    "speed": 152,
+    "sector": 0,
+    "checkpointsPassed": true,
+    "standings": [
+      {
+        "name": "DEX KOWALSKI",
+        "lap": 3,
+        "finished": true
+      },
+      {
+        "name": "ONYX",
+        "lap": 3,
+        "finished": true
+      },
+      {
+        "name": "RHEA SAINT",
+        "lap": 3,
+        "finished": true
+      },
+      {
+        "name": "KAI 'ZERO' MORROW",
+        "lap": 3,
+        "finished": true
+      },
+      {
+        "name": "LUNA VOSS",
+        "lap": 3,
+        "finished": true
+      },
+      {
+        "name": "YOU",
+        "lap": 3,
+        "finished": true
+      }
+    ],
+    "completedLaps": [
+      64.86666666666595,
+      51.66666666666373,
+      57.99999999999672
+    ],
+    "aiLaps": [
+      {
+        "name": "KAI 'ZERO' MORROW",
+        "lap": 3,
+        "index": 464,
+        "progress": 0.8451730418943534
+      },
+      {
+        "name": "LUNA VOSS",
+        "lap": 3,
+        "index": 453,
+        "progress": 0.825136612021858
+      },
+      {
+        "name": "DEX KOWALSKI",
+        "lap": 3,
+        "index": 488,
+        "progress": 0.8888888888888888
+      },
+      {
+        "name": "RHEA SAINT",
+        "lap": 3,
+        "index": 487,
+        "progress": 0.8870673952641166
+      },
+      {
+        "name": "ONYX",
+        "lap": 3,
+        "index": 474,
+        "progress": 0.8633879781420765
+      }
+    ],
+    "playerProgress": 0,
+    "playerIndex": 0,
+    "finished": true
+  },
+  "results": {
+    "visible": true,
+    "text": "NEON\nRUSH\nSESSION COMPLETE\nMAIN MENU\nCLASSIFICATION FINAL\nCHROME DOCKS // TERMINAL 09 // EAST\nNEW TRACK RECORD\nRACE COMPLETE\n\nThe lights went out and the night got away. Brake later, rotate cleaner, deploy earlier. Run i",
+    "record": {
+      "bestTimes": {
+        "docks": 174.5333333333264
+      },
+      "wins": 0,
+      "races": 1
+    }
+  },
+  "mobile": {
+    "overflowX": false,
+    "touchDisplay": "flex",
+    "gasButton": true,
+    "keysAfterTouch": [
+      "KeyW"
+    ],
+    "phase": "racing",
+    "canvas": true,
+    "before": 1
+  },
+  "mobileTouchReleased": [],
+  "errors": []
+}

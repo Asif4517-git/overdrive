@@ -1,0 +1,39 @@
+{
+  "laps": {
+    "phase": "racing",
+    "lap": 1,
+    "crossedLine": true,
+    "events": [
+      {
+        "crossedLine": true,
+        "t": 2,
+        "toast": "LAP 01 OF 3"
+      },
+      {
+        "lap": 1,
+        "t": 76.52,
+        "toast": "LAP 2 OF 3"
+      }
+    ],
+    "toasts": [
+      "LAP 01 OF 3",
+      "SECTOR 01 CLEAR",
+      "SECTOR 02 CLEAR",
+      "LAP 2 OF 3"
+    ],
+    "invalidToast": false,
+    "completedLaps": [
+      74.52
+    ],
+    "bestLap": 74.52,
+    "totalTime": 150,
+    "hudLap": 2
+  },
+  "mobile": {
+    "overlaps": [],
+    "panels": 5,
+    "touch": "flex",
+    "overflow": false
+  },
+  "errors": []
+}

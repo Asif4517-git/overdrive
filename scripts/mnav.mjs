@@ -1,0 +1,11 @@
+import puppeteer from 'puppeteer';
+const browser = await puppeteer.launch({ headless: 'shell', args: ['--no-sandbox','--disable-setuid-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--enable-webgl','--ignore-gpu-blocklist','--disable-dev-shm-usage','--mute-audio'] });
+const page = await browser.newPage();
+await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+await page.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded' });
+await new Promise(r => setTimeout(r, 2400));
+const navs = await page.evaluate(() => Array.from(document.querySelectorAll('header nav')).map(n => { const r = n.getBoundingClientRect(); return { display: getComputedStyle(n).display, top: Math.round(r.top), bottom: Math.round(r.bottom), labels: Array.from(n.querySelectorAll('button')).map(b => (b.textContent||'').trim()) }; }));
+console.log(JSON.stringify(navs, null, 2));
+await page.screenshot({ path: 'screenshots/09-mobile-menu.png' });
+await Promise.race([browser.close(), new Promise(r => setTimeout(r, 3000))]);
+process.exit(0);

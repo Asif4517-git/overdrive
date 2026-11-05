@@ -1,0 +1,173 @@
+================================================================================
+OVERDRIVE — GITHUB REPOSITORY METADATA
+Copy-paste values for the GitHub repository page
+================================================================================
+
+Repository owner (username) : asif4517-git
+Recommended repository name : overdrive
+Suggested live URL          : https://asif4517-git.github.io/overdrive/
+Suggested repo URL          : https://github.com/asif4517-git/overdrive
+Creator / developer         : Asif
+Portfolio                   : https://asif4517-git.github.io/
+Instagram                   : @asif_xrk  (https://instagram.com/asif_xrk)
+Email                       : asifsrk4517@gmail.com
+
+
+--------------------------------------------------------------------------------
+1. SHORT DESCRIPTION — paste into GitHub "About" → Description
+--------------------------------------------------------------------------------
+Realistic browser driving game by Asif. 11 cars, manual gearbox, weather, 6
+circuits and a 3D garage. React + Three.js. Live:
+https://asif4517-git.github.io/overdrive/ · Portfolio:
+https://asif4517-git.github.io/ · Instagram @asif_xrk ·
+asifsrk4517@gmail.com
+
+Character count: 258 (GitHub limit is 350)
+
+
+--------------------------------------------------------------------------------
+2. ALTERNATE SHORT DESCRIPTION (cleaner, no links)
+--------------------------------------------------------------------------------
+OVERDRIVE — a realistic browser driving game by Asif. Eleven production cars,
+manual and automatic gearboxes, dynamic weather, six circuits and a 3D garage.
+Built with React, TypeScript and Three.js; hosted on GitHub Pages.
+
+Character count: 223
+
+
+--------------------------------------------------------------------------------
+3. WEBSITE FIELD — paste into GitHub "About" → Website
+--------------------------------------------------------------------------------
+https://asif4517-git.github.io/overdrive/
+
+
+--------------------------------------------------------------------------------
+4. TOPICS — paste one at a time into GitHub "About" → Topics
+--------------------------------------------------------------------------------
+driving-game
+racing-game
+car-simulator
+threejs
+react
+typescript
+vite
+webgl
+github-pages
+browser-game
+procedural-generation
+game-development
+asif4517-git
+
+GitHub accepts up to 20 topics, each up to 50 characters, lowercase,
+hyphen-separated. All of the above are valid.
+
+
+--------------------------------------------------------------------------------
+5. SOCIAL PREVIEW
+--------------------------------------------------------------------------------
+GitHub → Settings → General → Social preview → Upload an image.
+Recommended: 1280 x 640 px PNG/JPG, under 1 MB.
+Use a gameplay screenshot from screenshots/ (for example od-01-home.png or
+od-06-race-cockpit.png), or a clean composition of the hero image.
+
+
+--------------------------------------------------------------------------------
+6. READY-TO-RUN COMMANDS (GitHub CLI)
+--------------------------------------------------------------------------------
+Requires GitHub CLI installed and authenticated:
+
+    gh auth login
+    gh auth status
+
+From the project folder:
+
+    git init
+    git add .
+    git commit -m "OVERDRIVE — realistic browser driving game"
+    git branch -M main
+
+    gh repo create overdrive \
+      --public \
+      --source=. \
+      --remote=origin \
+      --push \
+      --description "Realistic browser driving game by Asif. 11 cars, manual gearbox, weather, 6 circuits and a 3D garage. React + Three.js. Live: https://asif4517-git.github.io/overdrive/ · Portfolio: https://asif4517-git.github.io/ · Instagram @asif_xrk · asifsrk4517@gmail.com"
+
+    gh repo edit asif4517-git/overdrive \
+      --homepage "https://asif4517-git.github.io/overdrive/" \
+      --description "Realistic browser driving game by Asif. 11 cars, manual gearbox, weather, 6 circuits and a 3D garage. React + Three.js. Live: https://asif4517-git.github.io/overdrive/ · Portfolio: https://asif4517-git.github.io/ · Instagram @asif_xrk · asifsrk4517@gmail.com" \
+      --add-topic driving-game \
+      --add-topic racing-game \
+      --add-topic car-simulator \
+      --add-topic threejs \
+      --add-topic react \
+      --add-topic typescript \
+      --add-topic vite \
+      --add-topic webgl \
+      --add-topic github-pages \
+      --add-topic browser-game \
+      --add-topic procedural-generation \
+      --add-topic game-development \
+      --add-topic asif4517-git
+
+If the repository already exists:
+
+    git remote add origin https://github.com/asif4517-git/overdrive.git
+    git branch -M main
+    git push -u origin main
+
+A wrapper script is provided: scripts/set-repo-metadata.sh
+
+
+--------------------------------------------------------------------------------
+7. GITHUB PAGES SETTINGS
+--------------------------------------------------------------------------------
+Settings → Pages:
+  Source .............. Deploy from a branch  ->  switch to "GitHub Actions"
+  Workflow ............ .github/workflows/deploy.yml
+  Branch that deploys . main
+  Live URL ............ https://asif4517-git.github.io/overdrive/
+  Custom domain ....... optional
+  Enforce HTTPS ....... enable once the certificate is ready
+
+Actions → Deploy OVERDRIVE to GitHub Pages → Run workflow
+The first successful deployment creates the GitHub Pages environment.
+
+
+--------------------------------------------------------------------------------
+8. REPOSITORY SETTINGS RECOMMENDATIONS
+--------------------------------------------------------------------------------
+- Visibility: Public (required for free GitHub Pages).
+- Features: Issues on, Discussions optional, Projects optional, Wiki optional.
+- Merge button: Squash merging recommended.
+- Automatically delete head branches: on.
+- Dependabot alerts: on.
+- Code security: enable secret scanning and push protection.
+- Add a LICENSE file before accepting contributions; none is included yet.
+
+
+--------------------------------------------------------------------------------
+9. DESCRIPTION WITH ONLY THE SUPPLIED DETAILS
+--------------------------------------------------------------------------------
+Creator: Asif
+Portfolio: https://asif4517-git.github.io/
+Instagram: @asif_xrk
+Email: asifsrk4517@gmail.com
+Project: OVERDRIVE — Real roads. Real machines. Pure driving.
+
+Do not add achievements, credentials, employers or other personal details that
+were not supplied by the developer.
+
+
+--------------------------------------------------------------------------------
+10. HONEST NOTES TO KEEP IN THE DESCRIPTION / README
+--------------------------------------------------------------------------------
+- OVERDRIVE is an unofficial independent project.
+- It is not affiliated with, sponsored by or endorsed by any vehicle
+  manufacturer.
+- Cars are original procedural 3D interpretations, not licensed or scanned
+  vehicle assets.
+- Circuits reference real locations but use original layouts.
+- No backend, account, analytics or cloud storage is used.
+- Progress is stored locally in the browser.
+================================================================================

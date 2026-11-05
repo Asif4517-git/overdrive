@@ -1,0 +1,28 @@
+import puppeteer from 'puppeteer';
+const browser = await puppeteer.launch({ headless: 'shell', args: ['--no-sandbox','--disable-setuid-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--enable-webgl','--ignore-gpu-blocklist','--disable-dev-shm-usage','--mute-audio'] });
+const page = await browser.newPage();
+const errors = [];
+page.on('pageerror', (e) => errors.push(String(e.message)));
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+await page.setViewport({ width: 1366, height: 640 });
+await page.goto('http://127.0.0.1:8099/', { waitUntil: 'domcontentloaded' });
+await sleep(1200);
+await page.evaluate(() => Array.from(document.querySelectorAll('header button')).find((b) => (b.textContent || '').trim().toUpperCase() === 'RACE')?.click());
+await sleep(3200);
+const out = await page.evaluate(() => {
+  const shell = document.querySelector('.race-shell')?.getBoundingClientRect();
+  const canvas = document.querySelector('.race-canvas canvas')?.getBoundingClientRect();
+  const panels = Array.from(document.querySelectorAll('.hud-layer .hud-panel')).map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0);
+  return { viewport: [innerWidth, innerHeight], shell: shell ? [Math.round(shell.width), Math.round(shell.height)] : null, canvas: canvas ? [Math.round(canvas.width), Math.round(canvas.height)] : null, outOfBounds: panels.filter((r) => r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1).length, engine: !!window.__NEON_RUSH__ };
+});
+await page.screenshot({ path: 'screenshots/final-race-1366x640.png' });
+await page.setViewport({ width: 1920, height: 1080 });
+await sleep(900);
+const resized = await page.evaluate(() => { const c = document.querySelector('.race-canvas canvas')?.getBoundingClientRect(); return { viewport: [innerWidth, innerHeight], canvas: c ? [Math.round(c.width), Math.round(c.height)] : null, hudOut: Array.from(document.querySelectorAll('.hud-layer .hud-panel')).filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && (r.right > innerWidth + 1 || r.bottom > innerHeight + 1); }).length }; });
+await page.screenshot({ path: 'screenshots/final-race-1920.png' });
+out.resized = resized; out.errors = errors;
+console.log(JSON.stringify(out, null, 2));
+await page.close();
+await Promise.race([browser.close(), sleep(3000)]);
+process.exit(0);

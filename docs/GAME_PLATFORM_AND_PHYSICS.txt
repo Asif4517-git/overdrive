@@ -1,0 +1,499 @@
+================================================================================
+NEON RUSH — PLATFORM & PHYSICS HANDBOOK
+How the game works, and how to build another game with the same mechanics
+================================================================================
+
+Audience: someone building a new racing game on the NEON RUSH platform.
+Everything here reflects the delivered source code. Units are metres, seconds,
+kilograms and radians unless stated otherwise.
+
+
+================================================================================
+PART 1 — THE PLATFORM
+================================================================================
+
+1.1 What runs where
+
+  index.html
+    loads the bundled React application (single production file)
+
+  React (src/App.tsx)
+    screen state machine + persistence + navigation
+    owns nothing about the simulation
+    mounts RaceScreen only while racing
+
+  RaceGame (src/game/GameEngine.ts)
+    owns the WebGL renderer, scene, camera, simulation, AI, race rules,
+    audio session and HUD snapshots.
+    Constructor: new RaceGame(container, config, callbacks)
+    Callbacks: onHud(state), onFinish(result), onPauseRequest(), onReady()
+
+  Screens
+    menu / garage / circuits / settings / about / howto
+    race  — full-screen canvas + HUD
+    results — classification and telemetry
+
+1.2 Fixed-step simulation (important)
+
+  Rendering runs at the display refresh rate. The game world always advances
+  in fixed 1/60 s steps using an accumulator:
+
+      accumulator += min(frameDelta, 0.5)
+      while (accumulator >= 1/60) { tick(1/60); accumulator -= 1/60 }
+
+  Consequences:
+    - A 144 Hz monitor does not make physics faster than a 60 Hz monitor.
+    - A slow GPU cannot warp the clock: a 10 fps machine still simulates
+      real seconds, just with fewer drawn frames.
+    - Handling is deterministic for the same inputs (used by the autopilot
+      test harness).
+    - Never apply forces scaled by raw frame time; always use the fixed step.
+
+1.3 Rendering pipeline
+
+  WebGLRenderer (antialias by quality, high-performance)
+    toneMapping: ACES Filmic, exposure 0.90
+    outputColorSpace: sRGB
+    shadow maps: on for medium/high
+  Scene
+    fog: exponential, tinted per circuit
+    environment: PMREM cube map generated from an in-code light rig
+      (cyan key, magenta rim, white top, violet fill)
+  Post-processing (medium/high)
+    RenderPass -> UnrealBloomPass(strength 0.42, radius 0.38, threshold 0.86)
+    -> OutputPass
+  Quality tiers
+    low    no bloom, no shadows, pixel ratio 1
+    medium 1024 shadow maps, pixel ratio <= 1.5
+    high   2048 soft shadows, pixel ratio <= 2, stronger bloom
+
+1.4 Quality switching at runtime
+
+  RaceGame.setQuality(next) rebuilds the composer and shadow configuration
+  without resetting the race. Pixel ratio and renderer size are recalculated.
+  A ResizeObserver, window resize, orientationchange and fullscreenchange all
+  call the same bound resize handler, so the canvas always matches the
+  containing element exactly.
+
+1.5 Resource and lifecycle discipline
+
+  - All textures are generated on canvas at start-up and cached on materials.
+  - Instanced meshes are used for towers, street lamps, posts and traffic.
+  - Particle systems are pre-allocated pools (fixed buffers), never per-frame
+    allocations.
+  - dispose() stops the animation frame, removes every listener, disconnects
+    observers, clears timeouts, disposes the composer, geometries, materials
+    and renderer, and forces loss of the WebGL context.
+  - Audio must be created and resumed after a user gesture.
+
+
+================================================================================
+PART 2 — THE TRACK SYSTEM
+================================================================================
+
+2.1 Track definition (data)
+
+  Every circuit is described by:
+
+    rx, rz          horizontal radii that set the overall oval shape
+    harmonicA/B     amplitude of 3rd and 5th harmonic radius variations
+    elevation       height amplitude
+    width           road width in metres
+    accent/accent2  neon colours
+    skyTop/horizon/fogColor
+    laps, turns, grip, lengthLabel
+
+  buildControlPoints() evaluates a closed loop:
+
+    a = i / N * 2pi
+    radius = 1 + harmonicA*sin(3a+0.55) + harmonicB*cos(5a+1.6)
+                + 0.4*harmonicB*sin(7a-0.4)
+    x = cos(a) * rx * radius
+    z = sin(a) * rz * radius
+    y = 1.8 + elevation * (0.5 + 0.5*sin(2a+0.7))
+
+  A Catmull-Rom closed spline is fitted through the points. The spline is then
+  sampled by arc length into `samples`:
+
+    pos       Vector3 centre of the road
+    tangent   unit forward vector
+    side      unit right vector = tangent x up
+    distance  metres from the start
+    curvature |dT/ds| in radians per metre
+
+  Anything that needs the road at runtime uses these samples: physics bounds,
+  AI steering, camera containment, minimap and lap progress.
+
+2.2 Meshes generated from samples
+
+  - Road ribbon: textured asphalt, UV length along d/s.
+  - Kerb ribbons both sides, striped.
+  - Barrier walls (vertical ribbon), guardrail and neon strips.
+  - Support columns, instanced posts.
+  - Start line, start gantry and two sector gates.
+  - Apex chevrons on curvature peaks.
+
+2.3 Progress and lap rules
+
+  progress = nearestSampleIndex / sampleCount        (0..1)
+
+  Crossings are detected on the wrapped interval (previous > 0.76 and
+  current < 0.24). The grid sits just behind the start line, so the first
+  crossing opens lap 1 without an invalid-lap warning (player.crossedLine).
+  A lap counts only if both sector gates were passed in order.
+  This prevents cutting the course for a lap time.
+
+2.4 Reusing this system for a new game
+
+  1. Add an entry to TRACKS in src/game/data.ts with new harmonics, size,
+     elevation and colours.
+  2. That alone produces geometry, a minimap, AI racing lines and lap logic.
+  3. Build a real-world circuit by replacing the harmonics with a sampled
+     polyline of surveyed corner coordinates; keep the same TrackSample shape
+     and everything downstream keeps working.
+  4. Adjust width and grip per circuit to change the driving experience.
+
+
+================================================================================
+PART 3 — THE DRIVING PHYSICS
+================================================================================
+
+These are the exact rules in RaceGame.updatePlayer(). Study them, tune them,
+reuse them. Do not mix them with render code.
+
+3.1 State
+
+  pos       world position Vector3 (y follows the road surface)
+  vel       world velocity Vector3, metres/second
+  heading   yaw radians; forward = (sin h, 0, cos h)
+  steering  smoothed input -1..1 (positive = left when looking from behind)
+  spin      accumulated wheel rotation
+  nitro     0..100
+  boosting  boolean
+  drifting  boolean
+  driftScore, driftTime
+
+3.2 Axes
+
+  forward = ( sin(heading), 0,  cos(heading) )
+  right   = ( cos(heading), 0, -sin(heading) )
+
+  Decompose velocity:
+    forwardSpeed = dot(vel, forward)
+    lateralSpeed = dot(vel, right)
+
+3.3 Speed cap and forces
+
+  maxSpeed = car.topSpeed * (boosting ? 1.24 : 1) * track.grip
+
+  Throttle:
+    powerCurve = 1 - clamp(axial / maxSpeed, 0, 1) * 0.72
+    axial += car.acceleration * powerCurve * dt
+
+  Braking (S):
+    axial -= (axial > 0.8 ? 24 : 9) * dt
+    (the smaller value below 0.8 m/s is reverse creep)
+
+  Coasting and drag:
+    if no throttle and no brake: axial *= exp(-0.7 * dt)
+    otherwise:                   axial *= exp(-0.035 * dt)
+    axial -= roadTangentY * 12 * dt        (gravity up/down slopes)
+    axial = clamp(axial, -15, maxSpeed)    (reverse cap 15 m/s)
+
+  Nitro adds acceleration:
+    axial += car.acceleration * 1.05 * car.nitroPower * dt
+
+  Steering is speed-sensitive:
+    yawRate = steering * 1.5 * car.handling
+              * clamp(|axial| / 7, 0, 1)          (no turning when stopped)
+              * (1 - clamp(|axial| / topSpeed, 0, 1) * 0.4)
+              * (handbrake ? 1.5 : 1)
+              * (axial < 0 ? -1 : 1)              (reverse steering inverts)
+
+3.4 The momentum (drift) model — the most important part
+
+  oldForwardVelocity = forward * axial + right * lateral
+  heading += yawRate * dt
+  recompute forward and right from the NEW heading
+
+  newForward = dot(oldVelocity, newForwardAxis)
+  newLateral = dot(oldVelocity, newRightAxis)
+
+  lateral grip:
+    grip = car.grip * track.grip * (handbrake ? 0.17 : 1)
+    lateral *= exp(-grip * dt)
+    newLateral *= exp(-grip * 0.85 * dt)
+
+  vel = forward * newForward + right * newLateral
+  pos += vel * dt
+
+  Why: the chassis rotates but the velocity does not rotate with it. The
+  difference is visual and physical slip. Handbrake reduces lateral grip so
+  the nose turns while the car keeps sliding. Releasing the handbrake lets
+  grip pull the velocity back in line. This is what produces a controllable
+  drift instead of a scripted animation.
+
+  Counter-steer stabiliser:
+    if |newLateral| > 4 and steering != 0:
+      heading -= sign(newLateral) * 0.16 * |steering| * dt
+    then recompute velocities.
+    This makes slides recoverable and prevents a tank-slapper.
+
+3.5 Car data (the only values to tune for a new vehicle)
+
+  topSpeed       m/s cap before nitro and track grip
+  acceleration   m/s^2 base forward acceleration
+  handling       yaw multiplier
+  grip           lateral grip coefficient (higher = sticks)
+  nitroPower     multiplier on boost acceleration
+  roof/spoiler   visual only
+
+  Current published values:
+
+    Vanta GT   topSpeed 68 m/s  accel 21  handling 1.00  grip 7.2  nitro 1.00
+    Spectre X  topSpeed 76 m/s  accel 19  handling 0.90  grip 6.3  nitro 1.18
+    Ronin Evo  topSpeed 64 m/s  accel 25  handling 1.14  grip 8.1  nitro 0.94
+
+  Behaviour that emerges from these numbers:
+    Spectre has the highest top speed and weakest lateral grip — fastest in
+    a straight line, easiest to slide.
+    Ronin accelerates hardest and rotates most — best out of slow corners.
+    Vanta sits between the two.
+
+3.6 Nitro
+
+  Activated with Shift when nitro > 0.5 and forwardSpeed > 4.
+  Drain: 24 units/second while held.
+  Recharge: 3.2 units/second normally, 9 extra while drifting,
+            plus 5 units/second extra during a sustained drift.
+  Effects: acceleration multiplier, 1.24 speed cap, flame scale, particle
+  burst, camera FOV +6..8, speed lines, HUD flash.
+
+3.7 Track boundary and collision response
+
+  Offset from road centre measured against sample.side.
+  wallLimit = halfWidth - 1.03
+
+  If |offset| > wallLimit:
+    push the car back to the limit along the inward normal
+    sameFrameVel = dot(vel, outwardNormal)
+    if sameFrameVel > 0: vel -= outwardNormal * sameFrameVel * 1.28
+    vel *= 0.84
+    impact effects + camera shake + audio if the normal speed was > 2.5 m/s
+
+  Car-to-car collisions:
+    Combine 2.35 m separation circles.
+    Push both cars apart proportionally, transfer velocity along the normal
+    and slow the AI slightly. A cooldown prevents audio spam.
+
+  This is deterministic, stable at high speed and cheap. It is deliberately
+  not a full deformation simulation.
+
+3.8 Wheel and visual follow-through
+
+  spin += forwardSpeed * dt * 2.55
+  visual body roll  = -steering * 0.055 - lateralVelocity * 0.0035
+  visual body pitch = -roadGradient * 1.25
+  These are cosmetic and never feed back into physics (except the slope term).
+
+3.9 Braking and grip on other surfaces
+
+  The current build models surface grip through track.grip (one value per
+  circuit). To add rain/gravel/dirt, multiply car.grip and braking force by a
+  surface coefficient in updatePlayer, e.g.:
+
+    asphalt 1.0 | wet 0.72 | gravel 0.55 | dirt 0.45 | grass 0.3
+
+  Keep the coefficient in one lookup table so handling stays predictable.
+
+
+================================================================================
+PART 4 — AI OPPONENTS
+================================================================================
+
+Each AI car stores pos, heading, speed, lane offset, lap and progress.
+
+  lookAhead = 10 + speed * 0.42 metres
+  maxCurvature = max curvature over 12 samples ahead
+  cornerLimit = baseSpeed * (1 - clamp(maxCurvature * 230, 0, 0.36))
+  targetSpeed = cornerLimit * rubberBand
+
+  rubberBand = 1 + clamp((playerProgress - aiProgress) * 0.08, -0.055, 0.10)
+  speed accelerates at accel*1.6 or brakes at 24 m/s^2 toward target
+  lane = baseLane + sin(time*0.34 + phase) * 0.85, clamped inside the road
+  heading eases toward a look-ahead point with a maximum turn rate
+  lap counting uses the same wrapped-progress rule as the player
+
+To make opponents harder: increase baseSpeed/accel, reduce rubber-band lag,
+or increase corner limit. To make them fair, always cap speed near the
+player's realistic cornering limit rather than giving them extra grip.
+
+
+================================================================================
+PART 5 — CAMERAS
+================================================================================
+
+  chase   distance 8.4 m, height 2.85 m, look 6.5 m ahead
+  far     distance 12.5 m, height 4.7 m
+  bumper  position +0.75 m forward, eye 0.82 m, look 22 m ahead
+  countdown orbit and finished cinematic camera are special modes
+
+  Smoothing uses exponential damping: value += (target-value)*(1-e^(-k dt)).
+  Camera position is clamped inside the circuit width and above the road.
+  FOV blends from 62 up to about 72 with speed and nitro.
+  Aspect-aware framing pushes the camera back on portrait screens.
+
+  To add cockpit or helicopter cameras, add a camera mode that computes a
+  desired position and a look target; the damping and collision clamp are
+  reusable.
+
+
+================================================================================
+PART 6 — AUDIO SYSTEM
+================================================================================
+
+  One AudioContext, created only after a user gesture.
+
+  Buses:  master -> destination
+          music  -> master
+          sfx    -> master
+          engine -> master
+
+  Engine: three oscillators (saw 1x, square 1.5x, saw 2x) through a lowpass
+  filter into an engine gain node; a sine sub and noise-based road layer.
+  Frequency interpolates with RPM; filter cutoff and gain follow throttle,
+  braking, drift and boost.
+
+  Drift: band-passed noise looped with gain gated by drift state.
+  SFX: countdown, UI clicks, nitro whoosh, impacts, gear shifts, finish sting.
+  Music: a 4-chord minor progression sequencer with kick, hats, bass and pad.
+
+  Volume values come from settings and are applied to the buses, so master,
+  music and SFX can be changed live without rebuilding nodes.
+
+
+================================================================================
+PART 7 — INPUT, HUD AND STATE
+================================================================================
+
+7.1 Keyboard
+  Keydown/keyup collect a Set of KeyboardEvent.code values. Movement axes
+  are read every fixed step. Escape is dispatched as a UI request; C cycles
+  camera; R recovers to the track.
+
+7.2 Touch
+  Buttons dispatch the same virtual key codes (arrowup, arrowdown, arrowleft,
+  arrowright, space, shiftleft) through setVirtualInput(code, isDown).
+  Releasing on pointerup/cancel/leave guarantees no stuck throttle.
+
+7.3 HUD contract
+  The engine produces an immutable snapshot: speed, gear, rpm, nitro, boost,
+  drift, score, position, lap, total laps, race time, lap time, best lap,
+  countdown, wrong-way, checkpoint message, standings, top speed, minimap
+  points, camera mode, effects intensity.
+  React never reaches into the engine for physics values.
+
+7.4 Persistence
+  localStorage keys:
+    neonrush-settings-v1  {quality, master, music, sfx, cameraShake, blips}
+    neonrush-profile-v1   {bestTimes:{trackId:seconds}, wins, races}
+  Load defensively: invalid JSON falls back to defaults, unknown fields are
+  ignored, quality/clamping is validated. Settings are applied to the audio
+  buses and the engine on the next race.
+
+
+================================================================================
+PART 8 — BUILDING ANOTHER GAME WITH THIS SYSTEM
+================================================================================
+
+8.1 Reuse the platform as-is
+
+  Take these files into a new project:
+    GameEngine.ts, track.ts, carModel.ts, environment.ts, particles.ts,
+    textures.ts, audio.ts, data.ts, types.ts, ui.tsx, Icons.tsx
+
+  Replace:
+    - the visual theme colours and copy in index.css and screens
+    - the TRACKS array (new worlds)
+    - the CARS array (new machines)
+    - the generated environment module (new biome)
+
+8.2 Add a game mode safely
+
+  1. Define a typed config in types.ts.
+  2. Add a mode module that consumes TrackSample and vehicle state; it must
+     not modify rendering.
+  3. Add a screen entry point only when the loop can be completed.
+  4. Emit results through the same onFinish callback path used by the race.
+  5. Add a test in scripts that simulates a full run and asserts the outcome.
+
+8.3 Tune a vehicle in five minutes
+
+  Change one value at a time in CARS:
+    - acceleration first (launch feel)
+    - grip second (cornering and drift)
+    - handling third (rotation speed)
+    - topSpeed last (straight-line balance)
+  Validate with the existing deterministic harness (scripts/dynamics-test.mjs):
+    expected: boost drains nitro and raises speed, drift lateral slip exceeds
+    ~8 m/s, braking stops the car, wall collision keeps the car inside.
+
+8.4 Add a surface (rain, gravel, dirt)
+
+  a. Add the visual material and particle response in track/environment.
+  b. Add a single surface coefficient lookup.
+  c. In updatePlayer, multiply grip and braking by the coefficient.
+  d. Optional: slower steering and reduced power on loose surfaces.
+  e. Add sound layer and spray particles.
+  f. Test braking distance and drift recovery before and after.
+
+8.5 Add ghost replay
+
+  Record every simulation step: time, pos, heading, spin, speed.
+  Playback interpolates between recorded steps and drives a visual-only car.
+  Keep the recording in memory or IndexedDB with a fixed-size typed array.
+  Ghosts must not affect collisions or the leaderboard validation.
+
+8.6 Performance checklist for a larger game
+
+  [ ] Instanced repeats: lamps, trees, posts, crowd, traffic.
+  [ ] LOD tiers for cars and scenery with distance-based swapping.
+  [ ] Frustum culling on by default; chunk the world.
+  [ ] One material per mesh where possible; atlas textures.
+  [ ] Cap pixel ratio at 2 (1.5 on mobile).
+  [ ] Pool particles and projectiles; never allocate in the loop.
+  [ ] Profile draw calls and triangles, not only FPS.
+  [ ] Keep physics under 4 ms even with multiple AI cars.
+  [ ] Load heavy assets asynchronously with a progress screen.
+
+8.7 Deployment
+
+  GitHub Pages compatible build (already configured):
+    npm run build -> dist/index.html (self-contained)
+    .github/workflows/deploy.yml publishes on push to main
+    deploy guide: GITHUB_PAGES.md
+  For a project page use the repository URL; for a user page use the root.
+  Always test the built output from a subdirectory before announcing the URL.
+
+
+================================================================================
+PART 9 — QUICK REFERENCE OF FILE RESPONSIBILITIES
+================================================================================
+
+  src/App.tsx                  screens, persistence, race wiring
+  src/game/GameEngine.ts       fixed-step sim, physics, AI, rules, camera, FX
+  src/game/track.ts            spline samples, road meshes, gates, minimap
+  src/game/environment.ts      city, sky, lights, motion, quality
+  src/game/carModel.ts         car geometry, wheels, lights, nitro flames
+  src/game/particles.ts        pooled GPU particles
+  src/game/audio.ts            engine, SFX, music, buses
+  src/game/textures.ts         canvas textures and deterministic RNG
+  src/game/data.ts             cars and circuits (edit here to add content)
+  src/game/types.ts            shared types and defaults
+  src/game/credits.ts          creator attribution
+  src/components/*             UI screens, HUD, icons, shared primitives
+  src/index.css                identity, layout grid, HUD, responsive rules
+
+================================================================================
+END — build something fast, then make it real.
+================================================================================

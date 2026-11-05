@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output (generated in CI and deployed as an artifact)
+dist/
+dist-ssr/
+
+# Local tooling
+*.local
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Raw QA captures and report files (curated screenshots are committed)
+artifacts/*.log
+artifacts/*.json

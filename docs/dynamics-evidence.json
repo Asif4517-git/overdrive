@@ -1,0 +1,40 @@
+{
+  "result": {
+    "boostStart": {
+      "nitro": 80,
+      "speed": 42
+    },
+    "boostEnd": {
+      "nitro": 62,
+      "speed": 7.1,
+      "boosting": true,
+      "flameScale": 0.74,
+      "topSpeedKmh": 30
+    },
+    "driftStart": {
+      "speed": 34,
+      "lateral": 0
+    },
+    "driftEnd": {
+      "drifting": false,
+      "driftFrames": 41,
+      "maxLateral": 24.06,
+      "score": 100,
+      "nitro": 88.8,
+      "steerWheel": 0.42
+    },
+    "brakeStart": 50,
+    "brakeEnd": 0.3,
+    "wall": {
+      "maxOffset": 6.72,
+      "halfWidth": 7.75,
+      "shake": 0,
+      "contained": true
+    },
+    "recovered": {
+      "distance": 0,
+      "speed": 0
+    }
+  },
+  "errors": []
+}
