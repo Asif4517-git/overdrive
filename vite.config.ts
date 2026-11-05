@@ -10,6 +10,12 @@ const __dirname = path.dirname(__filename);
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Repository Pages sites are served below /<repo-name>/, not at the domain root.
+  base: "/overdrive/",
+  preview: {
+    // Vite's host check must allow the sandbox's proxied browser preview origin.
+    allowedHosts: [".e2b.app"],
+  },
   plugins: [react(), tailwindcss(), viteSingleFile()],
   resolve: {
     alias: {

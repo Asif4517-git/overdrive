@@ -6,7 +6,7 @@
 **Repository:** <https://github.com/asif4517-git/overdrive>
 **Creator / Developer:** Asif — <https://asif4517-git.github.io/> · [@asif_xrk](https://instagram.com/asif_xrk) · [asifsrk4517@gmail.com](mailto:asifsrk4517@gmail.com)
 
-> **Cannot be published from this workspace.** This environment has no access to the GitHub account, remote repository or credentials. The deployment workflow and metadata are ready; the final `git push` must be run while signed in as **asif4517-git**.
+> **One-time repository setup required:** In the repository, open **Settings → Pages** and set **Build and deployment → Source** to **GitHub Actions**. GitHub's API requires repository-administration permission to create the Pages site, which is intentionally not granted to `GITHUB_TOKEN`. The workflow deploys after this setting is enabled; it does not attempt to create the site.
 
 ---
 
@@ -15,7 +15,7 @@
 | Item | File | Status |
 | --- | --- | --- |
 | GitHub Actions build and deploy | `.github/workflows/deploy.yml` | Ready |
-| Jekyll bypass | `public/.nojekyll` → copied to `dist/.nojekyll` | Ready |
+| Jekyll bypass | Workflow creates `dist/.nojekyll` before upload | Ready |
 | Single-file production build | `vite.config.ts` + `vite-plugin-singlefile` | Ready |
 | Repository/live URL config | `src/overdrive/site.ts` | Ready (`overdrive`) |
 | Repository description, topics, `gh` commands | `REPO_DESCRIPTION.txt` | Ready |
