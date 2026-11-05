@@ -2,7 +2,7 @@ name: Deploy OVERDRIVE to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, arena/60a00e8a-overdrive]
   workflow_dispatch:
 
 # Permissions required by the official GitHub Pages deployment actions.
